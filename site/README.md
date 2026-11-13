@@ -64,3 +64,13 @@ npm run site:deploy
 ```
 
 手动部署也不需要程序版本号。只发布 `site` 中的静态资源；源代码、工具链和本地下载包均不上传。
+
+## 搜索收录与分享
+
+首页标题和摘要明确说明 Windows 键盘映射、鼠标改键与侧键变中键的用途；canonical、Open Graph 和结构化信息统一使用官网域名。`robots.txt` 允许正常抓取并指向 `sitemap.xml`；站点地图只包含首页，不将 `#support` 等页内锚点当成独立页面。404 返回真实 404，并声明 `noindex`。
+
+首页有 `WebSite` 和 `SoftwareApplication` JSON-LD，描述真实功能、系统要求和免费使用，不添加评分或评论。结构化信息不会自动产生特殊搜索结果。修改 JSON-LD 后运行 `npm run site:check`，按提示同步 `_headers` 中的 CSP 哈希，保留严格的脚本来源限制。
+
+分享图为 `assets/social-preview.png`（1200 × 630），由 `../assets/generate_social_preview.py` 使用现有图标生成。网站运行和部署不依赖 Python。
+
+上线后可在 Google Search Console、Bing Webmaster Tools 和百度搜索资源平台中，用域名所有者账号验证网站并提交 `https://qingying.luming.host/sitemap.xml`。验证代码需来自实际账号，工程不预填占位值。Cloudflare 若启用了托管 robots 功能，需确认线上 `/robots.txt` 仍保留 Sitemap 声明并允许正常搜索抓取。收录和排名由搜索引擎决定，部署不会立即更新搜索结果。

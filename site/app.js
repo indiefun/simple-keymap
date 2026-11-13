@@ -8,7 +8,7 @@
   const issuesURL = httpURL(settings.issuesURL) || (repositoryURL ? repositoryURL.replace(/\/$/, "") + "/issues" : "");
   for (const [selector, url] of [["[data-repository]", repositoryURL], ["[data-issues]", issuesURL]]) {
     document.querySelectorAll(selector).forEach(link => {
-      if (!url) return;
+      if (!url) { link.hidden = true; return; }
       link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.hidden = false;
     });
   }

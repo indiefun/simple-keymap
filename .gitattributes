@@ -1,0 +1,3 @@
+# Keep inline structured data byte-for-byte stable for its CSP hash.
+site/*.html text eol=lf
+site/_headers text eol=lf

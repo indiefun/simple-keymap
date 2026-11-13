@@ -16,12 +16,15 @@ const {handler} = require("./serve-site.cjs");
   try {
     const page = await browser.newPage({viewport:{width:1440,height:980},reducedMotion:"reduce"});
     page.on("pageerror", e => errors.push(e.message));
+    page.on("console", message => { if (message.type() === "error" && /Content Security Policy|Refused to/.test(message.text())) errors.push(message.text()); });
     const checkSupportPosition = () => page.waitForFunction(() => {
       const top = document.querySelector("#support").getBoundingClientRect().top;
       return location.hash === "#support" && scrollY > 0 && top >= 0 && top < innerHeight / 3;
     });
     await page.goto(base);
     await page.locator("#demo-press").waitFor();
+    assert.match(await page.title(), /Windows.*键盘映射.*鼠标改键/);
+    assert.equal(await page.locator("h1").count(), 1);
     assert.equal(await page.locator("[data-download]").getAttribute("href"), "https://github.com/indiefun/simple-keymap/releases/latest");
     assert.equal(await page.locator("[data-download-proxy]").getAttribute("href"), "https://gh-proxy.com/https://github.com/indiefun/simple-keymap/releases/latest/download/SimpleKeymap-windows-latest.zip");
     assert.equal(await page.locator("[data-download-proxy]").isVisible(), true);
@@ -75,7 +78,28 @@ const {handler} = require("./serve-site.cjs");
     }
     const missing = await page.goto(base+"/page-does-not-exist");
     assert.equal(missing.status(),404);
+    assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
+    const sitemapResponse = await page.request.get(base+"/sitemap.xml");
+    assert.equal(sitemapResponse.status(), 200);
+    assert.match(sitemapResponse.headers()["content-type"], /xml/);
+    assert.deepEqual(await page.evaluate(xml => {
+      const document = new DOMParser().parseFromString(xml, "application/xml");
+      if (document.querySelector("parsererror")) throw new Error("Invalid sitemap XML");
+      return [...document.getElementsByTagName("loc")].map(element => element.textContent);
+    }, await sitemapResponse.text()), ["https://qingying.luming.host/"]);
+    const robotsResponse = await page.request.get(base+"/robots.txt");
+    assert.equal(robotsResponse.status(), 200);
+    assert.match(robotsResponse.headers()["content-type"], /text\/plain/);
+    assert.match(await robotsResponse.text(), /Sitemap: https:\/\/qingying\.luming\.host\/sitemap\.xml/);
+    const withoutJS = await browser.newContext({javaScriptEnabled:false, viewport:{width:1440,height:980}});
+    try {
+      const staticPage = await withoutJS.newPage();
+      await staticPage.goto(base);
+      assert.equal(await staticPage.locator('a[data-repository][href]').isVisible(), true);
+      assert.equal(await staticPage.locator('a[data-issues][href]').isVisible(), true);
+      assert.equal(await staticPage.locator('[data-download-proxy]').isVisible(), true);
+    } finally { await withoutJS.close(); }
     assert.deepEqual(errors, []);
-    console.log("Browser checks passed: demo press/release, support anchor navigation, QQ clipboard, QR, FAQ, 404, desktop and mobile layouts.");
+    console.log("Browser checks passed: demo, downloads, support, clipboard, QR, SEO files, real 404, static links without JavaScript, desktop and mobile layouts.");
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
 })().catch(error => { console.error(error); process.exitCode=1; });

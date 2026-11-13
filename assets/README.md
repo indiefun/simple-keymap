@@ -18,3 +18,5 @@ python assets/generate_icon.py
 ```
 
 资源工具为 `github.com/akavel/rsrc@v0.10.2`，本次放在 `.tools/bin/rsrc.exe`。代码中资源 ID 为 `1`，用于 exe、标题栏和界面品牌图标。
+
+`generate_social_preview.py` 使用现有图标生成官网的 1200 × 630 分享预览图，输出到 `site/assets/social-preview.png`。同样需要 Pillow，默认使用 Windows 微软雅黑；其他系统可通过 `--font` 和 `--bold-font` 指定中文字体。预览图只随网站发布，不影响程序打包。
