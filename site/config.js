@@ -5,5 +5,6 @@ globalThis.KEYMAP_SITE = Object.freeze({
   issuesURL: "",
   qqGroup: "1135778884",
   websiteURL: "https://qingying.luming.host/",
-  downloadURL: "https://github.com/indiefun/simple-keymap/releases/latest"
+  downloadURL: "https://github.com/indiefun/simple-keymap/releases/latest",
+  proxyDownloadURL: "https://gh-proxy.com/https://github.com/indiefun/simple-keymap/releases/latest/download/SimpleKeymap-windows-latest.zip"
 });

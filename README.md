@@ -90,7 +90,7 @@ git push origin v1.0.1
 
 `.github/workflows/release.yml` 仅响应 `v主版本.次版本.修订号` 标签，在 Windows 构建带版本号的 ZIP 和 SHA256，然后创建 GitHub Release。使用 GitHub 提供的 `GITHUB_TOKEN`，无需自行配置发布密钥。ZIP 内保留稳定的两个 exe 文件名，方便用户覆盖升级。
 
-网站继续由 Cloudflare 跟踪 `main` 自动更新；发布程序不需要修改网站的下载链接，`releases/latest` 会指向最新版本。
+网站继续由 Cloudflare 跟踪 `main` 自动更新；发布程序不需要修改网站的下载链接，`releases/latest` 会指向最新版本。发布 Action 还会上传内容相同的 `SimpleKeymap-windows-latest.zip` 和对应 SHA256，供官网通过 `gh-proxy.com` 提供国内加速下载；页面保留 GitHub Release 备用入口。
 
 ## 验证
 

@@ -6,7 +6,7 @@ const {root} = require("./serve-site.cjs");
 const sandbox = {};
 vm.runInNewContext(fs.readFileSync(path.join(root, "config.js"), "utf8"), sandbox);
 const config = sandbox.KEYMAP_SITE;
-for (const field of ["repositoryURL", "issuesURL", "websiteURL", "downloadURL"]) {
+for (const field of ["repositoryURL", "issuesURL", "websiteURL", "downloadURL", "proxyDownloadURL"]) {
   if (config[field]) assert.equal(new URL(config[field]).protocol, "https:", `${field} must use HTTPS`);
 }
 if (config.qqGroup) assert.match(config.qqGroup, /^\d{5,12}$/, "Invalid QQ group number");

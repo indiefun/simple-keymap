@@ -11,6 +11,9 @@
 - `qqGroup`：轻映专属交流群 `1135778884`。
 - `websiteURL`：`https://qingying.luming.host/`。
 - `downloadURL`：`https://github.com/indiefun/simple-keymap/releases/latest`，始终跳转到最新程序发布页。
+- `proxyDownloadURL`：通过 `gh-proxy.com` 加速下载最新 Release 的 `SimpleKeymap-windows-latest.zip`，作为国内下载主入口；GitHub Release 作为备用。
+
+发布 Action 会保留带版本号的原始 ZIP，同时上传内容相同的固定文件名 `SimpleKeymap-windows-latest.zip` 和对应 SHA256。`releases/latest/download/` 自动跟随新版本，网站无需逐次修改下载链接。
 
 微信收款码原样来自 `../d4-helper/assets/donate.jpg`。未配置的 GitHub / QQ 入口会自动隐藏。
 

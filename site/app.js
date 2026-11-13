@@ -16,10 +16,13 @@
   const qqGroup = /^\d{5,12}$/.test(settings.qqGroup || "") ? settings.qqGroup : "";
   document.querySelectorAll("[data-qq-container]").forEach(element => { element.hidden = !qqGroup; });
   document.querySelectorAll("[data-qq-number]").forEach(element => { element.textContent = qqGroup; });
-  const downloadURL = httpURL(settings.downloadURL);
-  document.querySelectorAll("[data-download]").forEach(link => {
-    if (downloadURL) link.href = downloadURL;
-  });
+  for (const [selector, value] of [["[data-download]", settings.downloadURL], ["[data-download-proxy]", settings.proxyDownloadURL]]) {
+    const url = httpURL(value);
+    document.querySelectorAll(selector).forEach(link => {
+      link.hidden = !url;
+      if (url) link.href = url;
+    });
+  }
 
   let toastTimer;
   function toast(message) {

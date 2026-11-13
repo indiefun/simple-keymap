@@ -40,6 +40,9 @@ jobs:
           $archive = "dist/SimpleKeymap-v$version-windows-x64.zip"
           $expected = ((Get-Content ($archive + '.sha256') -Raw) -split ' ')[0]
           if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $expected) { throw 'Checksum mismatch.' }
+          # Stable asset name lets the website follow the latest version without edits.
+          Copy-Item -LiteralPath $archive -Destination 'dist/SimpleKeymap-windows-latest.zip'
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'dist/SimpleKeymap-windows-latest.zip.sha256'), ($expected + "  SimpleKeymap-windows-latest.zip`n"), [System.Text.Encoding]::ASCII)
       - name: Publish GitHub Release
         shell: pwsh
         env:
@@ -48,5 +51,5 @@ jobs:
         run: |
           $version = $env:RELEASE_TAG -replace '^v', ''
           $archive = "dist/SimpleKeymap-v$version-windows-x64.zip"
-          gh release create $env:RELEASE_TAG $archive ($archive + '.sha256') --verify-tag --title "轻映 $env:RELEASE_TAG" --generate-notes
+          gh release create $env:RELEASE_TAG $archive ($archive + '.sha256') 'dist/SimpleKeymap-windows-latest.zip' 'dist/SimpleKeymap-windows-latest.zip.sha256' --verify-tag --title "轻映 $env:RELEASE_TAG" --generate-notes
           if ($LASTEXITCODE -ne 0) { throw 'Release publishing failed.' }

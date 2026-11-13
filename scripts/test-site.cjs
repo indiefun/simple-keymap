@@ -23,6 +23,8 @@ const {handler} = require("./serve-site.cjs");
     await page.goto(base);
     await page.locator("#demo-press").waitFor();
     assert.equal(await page.locator("[data-download]").getAttribute("href"), "https://github.com/indiefun/simple-keymap/releases/latest");
+    assert.equal(await page.locator("[data-download-proxy]").getAttribute("href"), "https://gh-proxy.com/https://github.com/indiefun/simple-keymap/releases/latest/download/SimpleKeymap-windows-latest.zip");
+    assert.equal(await page.locator("[data-download-proxy]").isVisible(), true);
     const press = page.locator("#demo-press");
     await press.hover(); await page.mouse.down();
     assert.match(await page.locator("#demo-state").textContent(), /鼠标中键按下/);
@@ -38,6 +40,7 @@ const {handler} = require("./serve-site.cjs");
     assert.equal(await page.locator("details[open]").count(), 1);
     await page.locator("summary").first().click();
     await page.screenshot({path:path.join(output, "website-desktop.png"),fullPage:true});
+    await page.locator("#download").screenshot({path:path.join(output, "download-desktop.png")});
     await page.locator('nav a[href="#support"]').click();
     await checkSupportPosition();
     assert.equal(new URL(page.url()).pathname, "/");
@@ -62,7 +65,10 @@ const {handler} = require("./serve-site.cjs");
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${pathname} overflows at ${width}px`);
         if (pathname === "/#support") await checkSupportPosition();
         if (width === 390) {
-          if (pathname === "/") await page.screenshot({path:path.join(output, "website-mobile.png"),fullPage:true});
+          if (pathname === "/") {
+            await page.screenshot({path:path.join(output, "website-mobile.png"),fullPage:true});
+            await page.locator("#download").screenshot({path:path.join(output, "download-mobile.png")});
+          }
           else await page.locator("#support").screenshot({path:path.join(output, "support-mobile.png")});
         }
       }
