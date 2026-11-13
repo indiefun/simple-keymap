@@ -1,0 +1,5 @@
+/dist/
+/dist-fixed/
+/.tools/
+*.test.exe
+*.tmp
