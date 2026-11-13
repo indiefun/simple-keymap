@@ -5,6 +5,7 @@ package main
 import (
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unsafe"
@@ -139,6 +140,18 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	defer destroyWindow.Call(a.hwnd)
 	a.apply()
 	a.refreshList()
+	// Native selection notifications keep inline validation and the primary
+	// action in sync; the large key cards retain the native combo behavior.
+	send(a.controls[idTarget], cbSetCurSel, 0, 0)
+	send(a.hwnd, wmCommand, uintptr(idTarget)|1<<16, a.controls[idTarget])
+	if _, valid := a.draftHint(); valid {
+		t.Fatal("same-key draft can be added")
+	}
+	send(a.controls[idTarget], cbSetCurSel, 2, 0)
+	send(a.hwnd, wmCommand, uintptr(idTarget)|1<<16, a.controls[idTarget])
+	if _, valid := a.draftHint(); !valid {
+		t.Fatal("valid selection did not restore add action")
+	}
 	a.command(idAdd) // The initial selections are X1 -> middle.
 	if len(a.cfg.Rules) != 1 || a.cfg.Rules[0].Source != "mouse_x1" || a.cfg.Rules[0].Target != "mouse_middle" {
 		t.Fatalf("unexpected default rule: %#v", a.cfg.Rules)
@@ -149,9 +162,12 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if s := send(a.controls[idList], lvmFirst+44, 0, 0xF000); s != 0x2000 {
 		t.Fatalf("new rule not checked: %x", s)
 	}
+	if _, valid := a.draftHint(); valid {
+		t.Fatal("duplicate rule can be added")
+	}
 	// Changing the native checkbox must update engine, label and persisted config.
-	item := listItem{State: 0x1000, StateMask: 0xF000}
-	send(a.controls[idList], lvmFirst+43, 0, uintptr(unsafe.Pointer(&item)))
+	// Click the visible center of the drawn checkbox without injecting input.
+	send(a.controls[idList], 0x0201, 1, uintptr(a.px(12))|uintptr(a.px(24))<<16)
 	if a.cfg.Rules[0].Enabled {
 		t.Fatal("unchecking did not pause the rule")
 	}
@@ -170,11 +186,12 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if !a.engine.enabled {
 		t.Fatal("mapping was not restored after recording")
 	}
+	testCaptureControlRestoration(t, a)
 	a.command(idToggle)
 	if a.cfg.Enabled || a.engine.enabled {
 		t.Fatal("global toggle did not pause")
 	}
-	item = listItem{State: 0x2, StateMask: 0x2}
+	item := listItem{State: 0x2, StateMask: 0x2}
 	send(a.controls[idList], lvmFirst+43, 0, uintptr(unsafe.Pointer(&item)))
 	a.command(idDelete)
 	if len(a.cfg.Rules) != 0 || send(a.controls[idList], lvmFirst+4, 0, 0) != 0 {
@@ -211,6 +228,98 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if a.cfg.Enabled || a.engine.enabled {
 		t.Fatal("hotkey re-enabled a failed input service")
 	}
+}
+
+func testCaptureControlRestoration(t *testing.T, a *application) {
+	t.Helper()
+	getText := user32.NewProc("GetWindowTextW")
+	isEnabled := user32.NewProc("IsWindowEnabled")
+	removeSubclass := comctl32.NewProc("RemoveWindowSubclass")
+	buttonText := func(hwnd uintptr) string {
+		var buffer [32]uint16
+		getText.Call(hwnd, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
+		return syscall.UTF16ToString(buffer[:])
+	}
+	for _, side := range []struct {
+		name                 string
+		button, combo, index int
+	}{
+		{"source", idRecordSource, idSource, 6}, {"target", idRecordTarget, idTarget, 7},
+	} {
+		for _, path := range []string{"captured", "escape", "cancel-button", "timeout"} {
+			t.Logf("capture control restoration: %s/%s", side.name, path)
+			// Keep native controls on their owning locked thread. t.Run starts
+			// a separate goroutine, which would block on this window's messages.
+			func() {
+				recordButton := a.controls[side.button]
+				a.command(side.button)
+				if a.capturing != side.button || a.engine.enabled {
+					t.Fatal("recording did not start paused")
+				}
+				if text := buttonText(recordButton); text != "取消录入" {
+					t.Errorf("recording button text = %q", text)
+				}
+				selection := send(a.controls[side.combo], cbGetCurSel, 0, 0)
+				stateAtTextRestore := -1
+				// WM_SETTEXT may synchronously repaint an owner-drawn button.
+				// Inspect the state that drawing would read during that message.
+				observer := syscall.NewCallback(func(hwnd uintptr, msg uint32, wp, lp, id, ref uintptr) uintptr {
+					result, _, _ := defSubclassProc.Call(hwnd, uintptr(msg), wp, lp)
+					if msg == 0x000C && buttonText(hwnd) == "录入按键" {
+						stateAtTextRestore = a.capturing
+					}
+					return result
+				})
+				setWindowSubclass.Call(recordButton, observer, 1, 0)
+				defer removeSubclass.Call(recordButton, observer, 1)
+				switch path {
+				case "captured":
+					send(a.hwnd, wmCaptured, uintptr(side.index), 0)
+				case "escape":
+					send(a.hwnd, wmCaptured, 0, 0)
+				case "cancel-button":
+					a.command(side.button)
+				case "timeout":
+					send(a.hwnd, wmTimer, 1, 0)
+				}
+				if stateAtTextRestore != 0 {
+					t.Errorf("button repainted while capture state was %d", stateAtTextRestore)
+				}
+				if a.capturing != 0 || a.capturePending || !a.engine.enabled {
+					t.Error("capture state or mapping was not restored")
+				}
+				for _, id := range []int{idRecordSource, idRecordTarget, idSource, idTarget, idToggle, idHelp, idList, idSupport} {
+					if enabled, _, _ := isEnabled.Call(a.controls[id]); enabled == 0 {
+						t.Errorf("control %d stayed disabled", id)
+					}
+				}
+				for _, id := range []int{idRecordSource, idRecordTarget} {
+					if text := buttonText(a.controls[id]); text != "录入按键" {
+						t.Errorf("record button %d text = %q", id, text)
+					}
+				}
+				if path == "captured" {
+					selection = uintptr(side.index - 1)
+				}
+				if got := send(a.controls[side.combo], cbGetCurSel, 0, 0); got != selection {
+					t.Errorf("selection = %d, want %d", got, selection)
+				}
+				_, valid := a.draftHint()
+				if enabled, _, _ := isEnabled.Call(a.controls[idAdd]); (enabled != 0) != valid {
+					t.Error("add button did not restore draft validation")
+				}
+			}()
+		}
+	}
+	// Completing another recording must preserve an existing global pause.
+	a.cfg.Enabled = false
+	a.startCapture(idRecordSource)
+	send(a.hwnd, wmCaptured, 6, 0)
+	if a.cfg.Enabled || a.engine.enabled {
+		t.Error("recording enabled mapping despite the global pause")
+	}
+	a.cfg.Enabled = true
+	a.apply()
 }
 
 func TestWindowsKeyboardExtendedAndRelease(t *testing.T) {

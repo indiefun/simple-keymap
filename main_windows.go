@@ -15,6 +15,11 @@ import (
 )
 
 const (
+	windowWidth  = 880
+	windowHeight = 680
+)
+
+const (
 	idSource = 101 + iota
 	idTarget
 	idRecordSource
@@ -24,12 +29,15 @@ const (
 	idList
 	idDelete
 	idHelp
+	idSupport
 )
 
 type application struct {
 	hwnd, instance                          uintptr
 	controls                                map[int]uintptr
 	font, smallFont, titleFont, headingFont uintptr
+	keyFont                                 uintptr
+	brandIcon                               uintptr
 	background, whiteBrush                  uintptr
 	rowImages                               uintptr
 	dpi                                     int
@@ -55,6 +63,10 @@ var app *application
 var windowCallback = syscall.NewCallback(windowProc)
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println("Simple Keymap " + appVersion)
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--input-worker" {
 		if !strings.EqualFold(filepath.Base(os.Args[0]), "SimpleKeymap.Input.exe") {
 			return
@@ -102,7 +114,7 @@ func main() {
 	// Keep every control reachable on smaller screens and large scaling settings.
 	sw, _, _ := getSystemMetrics.Call(0)
 	sh, _, _ := getSystemMetrics.Call(1)
-	for _, limit := range []int{(int(sw) - 48) * 96 / 860, (int(sh) - 100) * 96 / 726} {
+	for _, limit := range []int{(int(sw) - 48) * 96 / windowWidth, (int(sh) - 100) * 96 / windowHeight} {
 		if limit > 0 && limit < app.dpi {
 			app.dpi = limit
 		}
@@ -206,14 +218,17 @@ func (a *application) makeFont(size, weight int) uintptr {
 
 func (a *application) create() error {
 	a.instance, _, _ = getModuleHandle.Call(0)
-	a.font, a.smallFont = a.makeFont(15, 400), a.makeFont(13, 400)
-	a.titleFont, a.headingFont = a.makeFont(27, 600), a.makeFont(17, 600)
-	a.background, _, _ = createSolidBrush.Call(rgb(245, 247, 250))
+	a.font, a.smallFont = a.makeFont(14, 400), a.makeFont(12, 400)
+	a.titleFont, a.headingFont = a.makeFont(23, 600), a.makeFont(17, 600)
+	a.keyFont = a.makeFont(19, 600)
+	a.background, _, _ = createSolidBrush.Call(canvasColor)
 	a.whiteBrush, _, _ = createSolidBrush.Call(rgb(255, 255, 255))
 	cursor, _, _ := loadCursor.Call(0, 32512)
-	icon, _, _ := loadIcon.Call(0, 32512)
+	icon := loadBrandIcon(a.instance, a.px(32))
+	smallIcon := loadBrandIcon(a.instance, a.px(16))
+	a.brandIcon = loadBrandIcon(a.instance, a.px(44))
 	wc := windowClass{Size: uint32(unsafe.Sizeof(windowClass{})), WndProc: windowCallback,
-		Instance: a.instance, Cursor: cursor, Icon: icon, IconSmall: icon,
+		Instance: a.instance, Cursor: cursor, Icon: icon, IconSmall: smallIcon,
 		Background: a.background, ClassName: utf16(appClass)}
 	if r, _, err := registerClassEx.Call(uintptr(unsafe.Pointer(&wc))); r == 0 {
 		return fmt.Errorf("无法创建窗口：%v", err)
@@ -221,7 +236,7 @@ func (a *application) create() error {
 	init := struct{ Size, Classes uint32 }{8, 1}
 	initCommonControls.Call(uintptr(unsafe.Pointer(&init)))
 	style := uintptr(0x00C80000 | 0x00080000 | 0x00020000 | wsClipChildren) // Caption, menu, minimize.
-	r := rect{Right: int32(a.px(860)), Bottom: int32(a.px(726))}
+	r := rect{Right: int32(a.px(windowWidth)), Bottom: int32(a.px(windowHeight))}
 	adjustWindowRect.Call(uintptr(unsafe.Pointer(&r)), style, 0, 0)
 	w, h := int(r.Right-r.Left), int(r.Bottom-r.Top)
 	screenW, _, _ := getSystemMetrics.Call(0)
@@ -232,7 +247,7 @@ func (a *application) create() error {
 	}
 	var err error
 	a.hwnd, _, err = createWindowEx.Call(0x00010000, uintptr(unsafe.Pointer(utf16(appClass))),
-		uintptr(unsafe.Pointer(utf16(appTitle))), style, intArg(x), intArg(y), intArg(w), intArg(h), 0, 0, a.instance, 0)
+		uintptr(unsafe.Pointer(utf16(appTitle+" · "+appVersion))), style, intArg(x), intArg(y), intArg(w), intArg(h), 0, 0, a.instance, 0)
 	if a.hwnd == 0 {
 		return fmt.Errorf("无法创建窗口：%v", err)
 	}
@@ -261,15 +276,16 @@ func (a *application) createControls() error {
 		style       uintptr
 		x, y, w, h  int
 	}{
-		{"BUTTON", "暂停映射", idToggle, 0xB, 674, 38, 150, 42},
-		{"COMBOBOX", "原按键", idSource, 0x3 | wsVscroll, 48, 222, 248, 340},
-		{"BUTTON", "录入", idRecordSource, 0xB, 306, 222, 90, 34},
-		{"COMBOBOX", "目标按键", idTarget, 0x3 | wsVscroll, 464, 222, 248, 340},
-		{"BUTTON", "录入", idRecordTarget, 0xB, 722, 222, 90, 34},
-		{"BUTTON", "+ 添加映射", idAdd, 0xB, 660, 291, 152, 38},
-		{"SysListView32", "映射列表", idList, 0x1 | 0x4 | 0x8 | 0x40, 44, 414, 772, 188},
-		{"BUTTON", "删除所选", idDelete, 0xB, 36, 623, 116, 34},
-		{"BUTTON", "使用说明", idHelp, 0xB, 712, 623, 112, 34},
+		{"BUTTON", "暂停映射", idToggle, 0xB, 684, 102, 144, 32},
+		{"COMBOBOX", "按下这个键", idSource, 0x3 | wsVscroll, 32, 242, 368, 370},
+		{"BUTTON", "录入按键", idRecordSource, 0xB, 308, 204, 92, 28},
+		{"COMBOBOX", "变为这个键", idTarget, 0x3 | wsVscroll, 480, 242, 368, 370},
+		{"BUTTON", "录入按键", idRecordTarget, 0xB, 756, 204, 92, 28},
+		{"BUTTON", "+ 添加映射", idAdd, 0xB, 688, 338, 160, 40},
+		{"SysListView32", "映射列表", idList, 0x1 | 0x4 | 0x8 | 0x40 | 0x4000, 40, 478, 800, 144},
+		{"BUTTON", "删除所选", idDelete, 0xB, 740, 400, 108, 30},
+		{"BUTTON", "使用帮助", idHelp, 0xB, 776, 30, 72, 30},
+		{"BUTTON", "支持与反馈", idSupport, 0xB, 658, 30, 98, 30},
 	}
 	for _, c := range types {
 		if _, err := a.control(c.class, c.text, c.id, c.style, c.x, c.y, c.w, c.h); err != nil {
@@ -280,15 +296,17 @@ func (a *application) createControls() error {
 		for _, k := range keys {
 			send(a.controls[id], cbAddString, 0, uintptr(unsafe.Pointer(utf16(k.Label))))
 		}
-		send(a.controls[id], 0x0153, 0, uintptr(a.px(27))) // CB_SETITEMHEIGHT, list items.
-		send(a.controls[id], 0x0153, ^uintptr(0), uintptr(a.px(28)))
-		send(a.controls[id], 0x0161, 22, 0) // CB_SETMINVISIBLE.
+		send(a.controls[id], 0x0153, 0, uintptr(a.px(28))) // CB_SETITEMHEIGHT, list items.
+		send(a.controls[id], 0x0153, ^uintptr(0), uintptr(a.px(70)))
+		send(a.controls[id], 0x0161, 12, 0) // CB_SETMINVISIBLE.
 		setWindowTheme.Call(a.controls[id], uintptr(unsafe.Pointer(utf16("Explorer"))), 0)
+		setWindowSubclass.Call(a.controls[id], pickerCallback, uintptr(id), 0)
 	}
 	send(a.controls[idSource], cbSetCurSel, 0, 0)
 	send(a.controls[idTarget], cbSetCurSel, 2, 0)
 	list := a.controls[idList]
 	setWindowTheme.Call(list, uintptr(unsafe.Pointer(utf16("Explorer"))), 0)
+	setWindowSubclass.Call(list, listCallback, idList, 0)
 	send(list, lvmFirst+54, 0, 0x4|0x20|0x10000) // Checkboxes, full-row select, double buffering.
 	send(list, lvmFirst+1, 0, rgb(255, 255, 255))
 	send(list, lvmFirst+36, 0, rgb(38, 48, 62))
@@ -296,11 +314,11 @@ func (a *application) createControls() error {
 	for i, c := range []struct {
 		text  string
 		width int
-	}{{"原按键", 330}, {"映射为", 320}, {"状态", 108}} {
+	}{{"按下这个键", 352}, {"变为", 320}, {"状态", 110}} {
 		col := listColumn{Mask: 0x1 | 0x2 | 0x4, Text: utf16(c.text), Width: int32(a.px(c.width))}
 		send(list, lvmFirst+97, uintptr(i), uintptr(unsafe.Pointer(&col)))
 	}
-	a.rowImages, _, _ = imageListCreate.Call(1, uintptr(a.px(40)), 0x20, 1, 1)
+	a.rowImages, _, _ = imageListCreate.Call(1, uintptr(a.px(47)), 0x20, 1, 1)
 	if a.rowImages != 0 {
 		send(list, lvmFirst+3, 1, a.rowImages)
 	}
@@ -309,7 +327,7 @@ func (a *application) createControls() error {
 }
 
 func (a *application) dispose() {
-	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.background, a.whiteBrush} {
+	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.keyFont, a.background, a.whiteBrush} {
 		if object != 0 {
 			deleteObject.Call(object)
 		}
@@ -336,10 +354,15 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		case wmCommand:
 			if wParam>>16 == 0 {
 				app.command(int(wParam & 0xFFFF))
+			} else if wParam>>16 == 1 && (int(wParam&0xFFFF) == idSource || int(wParam&0xFFFF) == idTarget) {
+				app.updateDraft()
 			}
 			return 0
 		case wmNotify:
 			h := messageData[notifyHeader](&lParam)
+			if h.ID == idList && int32(h.Code) == -12 {
+				return app.drawList(messageData[listCustomDraw](&lParam))
+			}
 			if h.ID == idList && int32(h.Code) == -101 && !app.updating {
 				app.readChecks()
 				selected := send(app.controls[idList], lvmFirst+12, ^uintptr(0), 0x2)
@@ -442,8 +465,9 @@ func (a *application) command(id int) {
 		}
 	case idHelp:
 		messageBox.Call(a.hwnd, uintptr(unsafe.Pointer(utf16(
-			"1. 选择原按键和目标按键，点击「添加映射」。\n"+
-				"2. 也可以点击「录入」，再按一下键盘或鼠标按键。Esc 取消录入。\n"+
+			"轻映 "+appVersion+"\n\n"+
+				"1. 选择原按键和目标按键，点击「添加映射」。\n"+
+				"2. 也可以点击「录入按键」，再按一下键盘或鼠标按键。Esc 取消录入。\n"+
 				"3. 列表左侧勾选启用，取消勾选暂停；选中一行可删除。\n\n"+
 				"按住原按键 = 持续按住目标按键，松开即释放。\n"+
 				"Ctrl + Alt + F12：全局暂停 / 恢复。\n"+
@@ -453,18 +477,55 @@ func (a *application) command(id int) {
 				"目标程序以管理员运行时，轻映也需以管理员运行。\n"+
 				"部分游戏可能不接受模拟输入。\n\n"+
 				"配置自动保存至：\n"+a.path))), uintptr(unsafe.Pointer(utf16("轻映 · 使用说明"))), 0x40)
+	case idSupport:
+		a.openSupport()
 	}
 }
 
 func (a *application) apply() {
 	a.emit(a.engine.configure(a.cfg.Enabled && a.capturing == 0 && a.inputFailureMessage == "" && !a.closing, a.cfg.Rules))
-	if a.cfg.Enabled {
+	if a.inputFailureMessage != "" {
+		setText(a.controls[idToggle], "查看原因")
+	} else if a.cfg.Enabled {
 		setText(a.controls[idToggle], "暂停映射")
 	} else {
 		setText(a.controls[idToggle], "开启映射")
 	}
 	invalidateRect.Call(a.hwnd, 0, 0)
 	invalidateRect.Call(a.controls[idToggle], 0, 0)
+	// Owner-drawn recording buttons depend on capturing as well as their
+	// native text. Repaint them even if EnableWindow did not change state.
+	for _, id := range []int{idSource, idTarget, idList, idRecordSource, idRecordTarget} {
+		invalidateRect.Call(a.controls[id], 0, 0)
+	}
+}
+
+func (a *application) draftHint() (string, bool) {
+	i, j := int32(send(a.controls[idSource], cbGetCurSel, 0, 0)), int32(send(a.controls[idTarget], cbGetCurSel, 0, 0))
+	if i < 0 || j < 0 {
+		return "选择两个按键，开始创建映射。", false
+	}
+	if i == j {
+		return "两个按键相同，请换一个目标按键。", false
+	}
+	for _, r := range a.cfg.Rules {
+		if r.Source == keys[i].ID {
+			if r.Target == keys[j].ID {
+				return "这条映射已在下方列表中。", false
+			}
+			return "这个原按键已有映射，删除旧规则后可重新设置。", false
+		}
+	}
+	return "按下与抬起同步，长按也一样。", true
+}
+
+func (a *application) updateDraft() {
+	_, valid := a.draftHint()
+	enableWindow.Call(a.controls[idAdd], boolArg(valid && a.capturing == 0))
+	for _, id := range []int{idAdd, idSource, idTarget} {
+		invalidateRect.Call(a.controls[id], 0, 0)
+	}
+	invalidateRect.Call(a.hwnd, 0, 0)
 }
 
 func (a *application) changed(message string) {
@@ -486,7 +547,7 @@ func (a *application) refreshList() {
 	list := a.controls[idList]
 	send(list, lvmFirst+9, 0, 0)
 	for i, r := range a.cfg.Rules {
-		item := listItem{Mask: 0x1 | 0x8, Item: int32(i), Text: utf16(keyLabel(r.Source)), StateMask: 0xF000, State: 0x1000}
+		item := listItem{Mask: 0x1 | 0x8, Item: int32(i), Text: utf16(keyCaption(r.Source)), StateMask: 0xF000, State: 0x1000}
 		if r.Enabled {
 			item.State = 0x2000
 		}
@@ -494,7 +555,7 @@ func (a *application) refreshList() {
 		// LVS_EX_CHECKBOXES initializes inserted rows to unchecked, so apply
 		// the saved checkbox state explicitly after insertion.
 		send(list, lvmFirst+43, uintptr(i), uintptr(unsafe.Pointer(&item)))
-		item = listItem{SubItem: 1, Text: utf16(keyLabel(r.Target))}
+		item = listItem{SubItem: 1, Text: utf16("→    " + keyCaption(r.Target))}
 		send(list, lvmFirst+116, uintptr(i), uintptr(unsafe.Pointer(&item)))
 		status := "已暂停"
 		if r.Enabled {
@@ -505,6 +566,7 @@ func (a *application) refreshList() {
 	}
 	showWindow.Call(list, boolArg(len(a.cfg.Rules) != 0)*5)
 	enableWindow.Call(a.controls[idDelete], 0)
+	a.updateDraft()
 	invalidateRect.Call(a.hwnd, 0, 0)
 }
 
@@ -536,10 +598,10 @@ func (a *application) startCapture(id int) {
 	a.capturing = id
 	a.capturePending = false
 	a.apply()
-	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idHelp} {
+	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idHelp, idSupport} {
 		enableWindow.Call(a.controls[other], boolArg(other == id))
 	}
-	setText(a.controls[id], "取消")
+	setText(a.controls[id], "取消录入")
 	a.status = "现在按一下要录入的按键或鼠标按钮。Esc 取消，8 秒后自动结束。"
 	setTimer.Call(a.hwnd, 1, 8000, 0)
 	invalidateRect.Call(a.hwnd, 0, 0)
@@ -550,14 +612,17 @@ func (a *application) finishCapture(index int) {
 		return
 	}
 	killTimer.Call(a.hwnd, 1)
+	recordButton := a.capturing
 	combo := idSource
-	if a.capturing == idRecordTarget {
+	if recordButton == idRecordTarget {
 		combo = idTarget
 	}
-	setText(a.controls[a.capturing], "录入")
+	// SetWindowText can synchronously request owner drawing. Clear the
+	// recording state first so that repaint already sees the normal label.
 	a.capturing = 0
 	a.capturePending = false
-	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp} {
+	setText(a.controls[recordButton], "录入按键")
+	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp, idSupport} {
 		enableWindow.Call(a.controls[id], 1)
 	}
 	selected := int32(send(a.controls[idList], lvmFirst+12, ^uintptr(0), 0x2))
@@ -569,4 +634,5 @@ func (a *application) finishCapture(index int) {
 		a.status = "已取消录入。"
 	}
 	a.apply()
+	a.updateDraft()
 }

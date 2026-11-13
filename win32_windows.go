@@ -13,6 +13,7 @@ var (
 	kernel32               = syscall.NewLazyDLL("kernel32.dll")
 	comctl32               = syscall.NewLazyDLL("comctl32.dll")
 	uxtheme                = syscall.NewLazyDLL("uxtheme.dll")
+	shellExecute           = syscall.NewLazyDLL("shell32.dll").NewProc("ShellExecuteW")
 	registerClassEx        = user32.NewProc("RegisterClassExW")
 	createWindowEx         = user32.NewProc("CreateWindowExW")
 	defWindowProc          = user32.NewProc("DefWindowProcW")
@@ -38,11 +39,14 @@ var (
 	getClientRect          = user32.NewProc("GetClientRect")
 	getWindowRect          = user32.NewProc("GetWindowRect")
 	getCursorPos           = user32.NewProc("GetCursorPos")
+	getFocus               = user32.NewProc("GetFocus")
 	windowFromPoint        = user32.NewProc("WindowFromPoint")
 	adjustWindowRect       = user32.NewProc("AdjustWindowRectEx")
 	getSystemMetrics       = user32.NewProc("GetSystemMetrics")
 	loadCursor             = user32.NewProc("LoadCursorW")
 	loadIcon               = user32.NewProc("LoadIconW")
+	loadImage              = user32.NewProc("LoadImageW")
+	drawIconEx             = user32.NewProc("DrawIconEx")
 	messageBox             = user32.NewProc("MessageBoxW")
 	beginPaint             = user32.NewProc("BeginPaint")
 	endPaint               = user32.NewProc("EndPaint")
@@ -70,6 +74,8 @@ var (
 	deleteObject           = gdi32.NewProc("DeleteObject")
 	getStockObject         = gdi32.NewProc("GetStockObject")
 	roundRect              = gdi32.NewProc("RoundRect")
+	moveTo                 = gdi32.NewProc("MoveToEx")
+	lineTo                 = gdi32.NewProc("LineTo")
 	setTextColor           = gdi32.NewProc("SetTextColor")
 	setBkMode              = gdi32.NewProc("SetBkMode")
 	createFont             = gdi32.NewProc("CreateFontW")
@@ -81,6 +87,8 @@ var (
 	imageListCreate        = comctl32.NewProc("ImageList_Create")
 	imageListDestroy       = comctl32.NewProc("ImageList_Destroy")
 	setWindowTheme         = uxtheme.NewProc("SetWindowTheme")
+	setWindowSubclass      = comctl32.NewProc("SetWindowSubclass")
+	defSubclassProc        = comctl32.NewProc("DefSubclassProc")
 )
 
 const (
@@ -162,6 +170,26 @@ type listItem struct {
 	Columns                      uint32
 	ColumnIndices, ColumnFormats uintptr
 	Group                        int32
+}
+
+type customDraw struct {
+	Header notifyHeader
+	Stage  uint32
+	DC     uintptr
+	Rect   rect
+	Item   uintptr
+	State  uint32
+	Param  uintptr
+}
+
+type listCustomDraw struct {
+	Draw                                   customDraw
+	TextColor, TextBackground              uint32
+	SubItem                                int32
+	ItemType, FaceColor                    uint32
+	IconEffect, IconPhase, PartID, StateID int32
+	TextRect                               rect
+	Align                                  uint32
 }
 
 // LPARAM is a union: most messages carry integers, but WM_DRAWITEM and

@@ -1,0 +1,75 @@
+const {chromium} = require("playwright");
+const assert = require("node:assert/strict");
+const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
+const {handler} = require("./serve-site.cjs");
+
+(async () => {
+  const server = http.createServer(handler);
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({headless:true, channel:process.env.BROWSER_CHANNEL || "msedge"});
+  const output = path.resolve(__dirname, "../.tools");
+  fs.mkdirSync(output, {recursive:true});
+  const errors = [];
+  try {
+    const page = await browser.newPage({viewport:{width:1440,height:980},reducedMotion:"reduce"});
+    page.on("pageerror", e => errors.push(e.message));
+    const checkSupportPosition = () => page.waitForFunction(() => {
+      const top = document.querySelector("#support").getBoundingClientRect().top;
+      return location.hash === "#support" && scrollY > 0 && top >= 0 && top < innerHeight / 3;
+    });
+    await page.goto(base);
+    await page.locator("#demo-press").waitFor();
+    assert.equal(await page.locator("[data-download]").getAttribute("href"), "https://github.com/indiefun/simple-keymap/releases/latest");
+    const press = page.locator("#demo-press");
+    await press.hover(); await page.mouse.down();
+    assert.match(await page.locator("#demo-state").textContent(), /鼠标中键按下/);
+    await page.mouse.up();
+    assert.match(await page.locator("#demo-state").textContent(), /已抬起.*1 次/);
+    await press.focus(); await page.keyboard.down("Space"); await page.keyboard.up("Space");
+    assert.match(await page.locator("#demo-state").textContent(), /已抬起.*2 次/);
+    await page.locator("#demo-target").selectOption("空格");
+    await press.hover(); await page.mouse.down(); await page.mouse.up();
+    assert.match(await page.locator("#demo-state").textContent(), /空格已抬起.*1 次/);
+    await page.locator("#demo-target").selectOption("鼠标中键");
+    await page.locator("summary").first().click();
+    assert.equal(await page.locator("details[open]").count(), 1);
+    await page.locator("summary").first().click();
+    await page.screenshot({path:path.join(output, "website-desktop.png"),fullPage:true});
+    await page.locator('nav a[href="#support"]').click();
+    await checkSupportPosition();
+    assert.equal(new URL(page.url()).pathname, "/");
+    assert.equal(await page.locator("[data-qq-number]").textContent(), "1135778884");
+    assert.equal(await page.locator("[data-issues]").getAttribute("href"), "https://github.com/indiefun/simple-keymap/issues");
+    assert.equal(await page.locator("[data-issues]").isVisible(), true);
+    assert.equal(await page.locator(".donation-code img").evaluate(image => image.complete && image.naturalWidth === 355), true);
+    await page.context().grantPermissions(["clipboard-read","clipboard-write"]);
+    await page.locator("[data-copy-qq]").click();
+    await page.waitForFunction(() => document.querySelector("#toast").textContent.includes("群号已复制"));
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "1135778884");
+    await page.locator("#copy-feedback").click();
+    await page.waitForFunction(() => document.querySelector("#toast").textContent.includes("模板已复制"));
+    assert.match(await page.evaluate(() => navigator.clipboard.readText()), /原按键 → 目标按键/);
+    await page.goto(base+"/#support");
+    await checkSupportPosition();
+    await page.locator("#support").screenshot({path:path.join(output, "support-desktop.png")});
+    for (const width of [390, 320]) {
+      await page.setViewportSize({width,height:844});
+      for (const pathname of ["/", "/#support"]) {
+        await page.goto(base+pathname);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${pathname} overflows at ${width}px`);
+        if (pathname === "/#support") await checkSupportPosition();
+        if (width === 390) {
+          if (pathname === "/") await page.screenshot({path:path.join(output, "website-mobile.png"),fullPage:true});
+          else await page.locator("#support").screenshot({path:path.join(output, "support-mobile.png")});
+        }
+      }
+    }
+    const missing = await page.goto(base+"/page-does-not-exist");
+    assert.equal(missing.status(),404);
+    assert.deepEqual(errors, []);
+    console.log("Browser checks passed: demo press/release, support anchor navigation, QQ clipboard, QR, FAQ, 404, desktop and mobile layouts.");
+  } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+})().catch(error => { console.error(error); process.exitCode=1; });

@@ -1,0 +1,17 @@
+{
+  "name": "simple-keymap-site",
+  "private": true,
+  "description": "Static website with integrated support for Simple Keymap",
+  "scripts": {
+    "site:dev": "node scripts/serve-site.cjs",
+    "site:check": "node scripts/check-site.cjs",
+    "site:test": "node scripts/test-site.cjs",
+    "site:preview": "wrangler dev --port 8787",
+    "site:deploy:check": "npm run site:check && wrangler deploy --dry-run",
+    "site:deploy": "npm run site:check && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.161.0",
+    "playwright": "1.64.1"
+  }
+}

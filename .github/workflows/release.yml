@@ -1,0 +1,52 @@
+name: Release Windows app
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+      - name: Build and test versioned package
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./build.ps1 -Version $env:RELEASE_TAG
+      - name: Verify embedded version and checksum
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          $process = Start-Process -FilePath ./dist/SimpleKeymap.exe -ArgumentList '--version' -NoNewWindow -Wait -PassThru -RedirectStandardOutput ./dist/version.txt
+          if ($process.ExitCode -ne 0 -or (Get-Content ./dist/version.txt -Raw).Trim() -ne "Simple Keymap $version") { throw 'Embedded version mismatch.' }
+          $archive = "dist/SimpleKeymap-v$version-windows-x64.zip"
+          $expected = ((Get-Content ($archive + '.sha256') -Raw) -split ' ')[0]
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $expected) { throw 'Checksum mismatch.' }
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          $archive = "dist/SimpleKeymap-v$version-windows-x64.zip"
+          gh release create $env:RELEASE_TAG $archive ($archive + '.sha256') --verify-tag --title "轻映 $env:RELEASE_TAG" --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw 'Release publishing failed.' }

@@ -2,6 +2,10 @@
 
 Windows x64 桌面小工具，用 Go 和原生 Win32 编写。用一个键替代另一个键，无需安装驱动或系统服务。
 
+官网：<https://qingying.luming.host/> · [下载最新版](https://github.com/indiefun/simple-keymap/releases/latest) · [问题反馈](https://github.com/indiefun/simple-keymap/issues)
+
+应用图标采用两枚叠放键帽与映射箭头，源文件和多尺寸 Windows 图标见 `assets`。图标已嵌入程序，重新编译会自动包含。
+
 ## 使用
 
 双击 **`dist/SimpleKeymap.exe`**。同目录的 `SimpleKeymap.Input.exe` 是隐藏的输入辅助进程，需要一起保留。所有打包文件统一在 `dist`。
@@ -9,7 +13,9 @@ Windows x64 桌面小工具，用 Go 和原生 Win32 编写。用一个键替代
 1. 默认已选好「鼠标侧键 1（后退）→ 鼠标中键（滚轮按下）」，点击「添加映射」即可。
 2. 列表左侧勾选框控制单条规则，选中一行后可删除。
 3. 右上角控制全部映射；`Ctrl + Alt + F12` 全局暂停 / 恢复。
-4. 可以从列表选择其他键，也可点击「录入」后实际按一下。Esc 取消录入，8 秒后自动取消。
+4. 点击按键卡片可展开选择，也可点击旁边的「录入按键」后实际按一下。Esc 取消录入，8 秒后自动取消。
+
+界面上方始终显示总状态；来源和目标用两张按键卡片表示。相同按键、重复映射会直接显示提示并禁用添加按钮。录入时对应卡片会显示「等待按键」，已有规则可在下方勾选启用或暂停。
 
 映射完全跟随原按键的按下和抬起：
 
@@ -25,6 +31,18 @@ Windows x64 桌面小工具，用 Go 和原生 Win32 编写。用一个键替代
 配置窗口内暂不执行映射，方便操作；切到其他程序后生效。最小化后继续映射，关闭窗口停止监听并退出。正常退出会丢弃积压操作，仅释放已经模拟按住的键。
 
 配置自动保存到 `%APPDATA%/SimpleKeymap/config.json`。启动会恢复规则和总开关；配置读取失败时暂停，并保留原文件直到主动修改。
+
+## 支持与捐助
+
+程序右上角的「支持与反馈」会在默认浏览器打开 `https://qingying.luming.host/#support`，直接定位到官网首页下方的支持区域。这里提供 QQ 交流、问题反馈模板和自愿捐助入口，捐助不影响任何功能。网站支持信息在 `site/config.js` 配置；GitHub 仓库未配置时隐藏 Issues / 源码链接。若更换官网域名，同时更新 `support_windows.go` 中的链接并重新打包。
+
+轻映专属 QQ 交流群：`1135778884`。微信收款码原样复制自 d4-helper 工程，未改动二维码内容。
+
+## 官网与 Cloudflare Workers
+
+`site` 是单页静态官网，包含功能介绍、映射演示、使用说明、下载和支持区域。域名为 `https://qingying.luming.host/`，`wrangler.jsonc` 已配置 Workers Static Assets。网站下载入口指向 GitHub 最新 Release，网站部署不依赖 Go 或下载包。
+
+本地运行 `npm ci`、`npm run site:dev` 预览，`npm run site:deploy:check` 检查部署包。Cloudflare Workers Builds 连接本仓库 `main` 分支后，每次推送自动发布静态页面，无需标签或网站版本号。一次性连接步骤见 [site/README.md](site/README.md)。
 
 ## 异常与退出
 
@@ -48,15 +66,31 @@ Windows x64，Go 1.23 或更新版本；无第三方 Go 依赖，不需要 C 编
 
 ```powershell
 .\build.ps1
+# 或指定版本，GitHub Release 也使用同一脚本：
+.\build.ps1 -Version 1.0.0
 ```
 
-脚本运行测试和 `go vet`，随后结束**本工程目录内**正在运行的轻映及输入辅助进程，重新生成 `dist` 内的两个 exe。不会结束其他目录里的同名程序。测试或构建失败会报错。Go 不在 PATH 时使用工程内 `.tools/go/bin/go.exe`。
+脚本运行测试和 `go vet`，随后结束**本工程目录内**正在运行的轻映及输入辅助进程，重新生成 `dist` 内的两个 exe、`SimpleKeymap-v1.0.0-windows-x64.zip` 和同名 `.sha256` 校验文件。版本默认取 `VERSION`，也可用 `-Version` 指定；标题栏、使用帮助和包内说明都包含版本号。不会结束其他目录里的同名程序。测试或构建失败会报错。Go 不在 PATH 时使用工程内 `.tools/go/bin/go.exe`。
 
 仅检查、不打包、不结束正在使用的程序：
 
 ```powershell
 .\build.ps1 -TestOnly
 ```
+
+## 自动打包与发布
+
+普通推送和 PR 会运行 Windows 程序测试、`go vet`、网站资源与浏览器检查，不发布程序。发布新程序时，更新 `VERSION` 并提交，然后推送同一版本的标签：
+
+```powershell
+git push origin main
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+`.github/workflows/release.yml` 仅响应 `v主版本.次版本.修订号` 标签，在 Windows 构建带版本号的 ZIP 和 SHA256，然后创建 GitHub Release。使用 GitHub 提供的 `GITHUB_TOKEN`，无需自行配置发布密钥。ZIP 内保留稳定的两个 exe 文件名，方便用户覆盖升级。
+
+网站继续由 Cloudflare 跟踪 `main` 自动更新；发布程序不需要修改网站的下载链接，`releases/latest` 会指向最新版本。
 
 ## 验证
 

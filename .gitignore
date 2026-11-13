@@ -3,3 +3,7 @@
 /.tools/
 *.test.exe
 *.tmp
+/node_modules/
+/.wrangler/
+/site/downloads/
+*.log

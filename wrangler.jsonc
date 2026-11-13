@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qingying-keymap",
+  "compatibility_date": "2026-11-13",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "qingying.luming.host", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}
