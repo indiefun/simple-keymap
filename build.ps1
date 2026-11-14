@@ -71,6 +71,7 @@ if (!$TestOnly) {
     }
     $taskChecksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $taskArchive).Hash.ToLowerInvariant()
     [System.IO.File]::WriteAllText(($taskArchive + '.sha256'), ($taskChecksum + '  ' + [System.IO.Path]::GetFileName($taskArchive) + "`n"), [System.Text.Encoding]::ASCII)
+    & (Join-Path $PSScriptRoot 'scripts/verify-package.ps1') -Version $Version -Archive $taskArchive
     Write-Host "Ready: $taskOutput"
     Write-Host "Package: $taskArchive"
 }

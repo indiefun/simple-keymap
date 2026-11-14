@@ -4,7 +4,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"unsafe"
 )
 
@@ -116,7 +115,10 @@ func (a *application) stateCopy() (string, string, uintptr, uintptr) {
 		}
 		return "规则均已暂停", "勾选下方规则，即可恢复对应映射。", muted, rgb(237, 240, 238)
 	}
-	return "映射已开启", fmt.Sprintf("%d 条规则已启用 · 切换到其他应用生效", count), accentColor, accentWash
+	if a.configurationActive {
+		return "配置窗口内暂不执行", fmt.Sprintf("%d 条规则待用 · 切到其他应用自动生效", count), accentColor, accentWash
+	}
+	return "映射已开启", fmt.Sprintf("%d 条规则已启用", count), accentColor, accentWash
 }
 
 func (a *application) paintContent(dc uintptr) {
@@ -128,7 +130,11 @@ func (a *application) paintContent(dc uintptr) {
 	a.box(dc, 50, 108, 7, 7, 7, color, color)
 	a.text(dc, title, 68, 98, 570, 25, a.font, color, 0x20)
 	a.text(dc, detail, 68, 124, 600, 21, a.smallFont, muted, 0x20|0x8000)
-	a.text(dc, "新建映射", 32, 174, 240, 28, a.headingFont, ink, 0x20)
+	heading := "新建映射"
+	if a.editing {
+		heading = "修改映射"
+	}
+	a.text(dc, heading, 32, 174, 240, 28, a.headingFont, ink, 0x20)
 	a.text(dc, "按下这个键", 32, 212, 270, 22, a.font, muted, 0x20)
 	a.text(dc, "变为这个键", 480, 212, 270, 22, a.font, muted, 0x20)
 	a.box(dc, 423, 264, 34, 34, 34, softColor, softColor)
@@ -136,7 +142,7 @@ func (a *application) paintContent(dc uintptr) {
 	a.line(dc, 443, 276, 448, 281, accentColor, 1)
 	a.line(dc, 443, 286, 448, 281, accentColor, 1)
 	hint, _ := a.draftHint()
-	a.text(dc, hint, 32, 350, 638, 24, a.smallFont, muted, 0x20|0x8000)
+	a.text(dc, hint, 32, 350, 512, 24, a.smallFont, muted, 0x20|0x8000)
 	a.line(dc, 32, 393, 848, 393, lineColor, 1)
 	a.text(dc, "我的映射", 32, 406, 140, 28, a.headingFont, ink, 0x20)
 	a.box(dc, 120, 408, 30, 22, 10, rgb(232, 237, 233), rgb(232, 237, 233))
@@ -153,17 +159,15 @@ func (a *application) paintContent(dc uintptr) {
 		a.text(dc, "状态", 736, 455, 90, 22, a.smallFont, muted, 0x20)
 		a.line(dc, 48, 478, 832, 478, lineColor, 1)
 	}
-	footer := "所有更改自动保存"
-	if a.status != "" && a.status != "准备好了，添加一条映射就可以开始。" && !strings.HasPrefix(a.status, "已载入") && len(a.status) < 120 {
-		footer = a.status
+	footerColor := muted
+	if a.configSaveError != "" {
+		footerColor = warningColor
 	}
-	if a.inputFailureMessage != "" {
-		footer = "输入服务已暂停，请查看上方原因。"
+	footerWidth := 408
+	if a.configSaveError != "" {
+		footerWidth = 318
 	}
-	if a.capturing != 0 {
-		footer = "录入时暂停全部映射，完成后自动恢复。"
-	}
-	a.text(dc, footer, 32, 648, 490, 22, a.smallFont, muted, 0x20|0x8000)
+	a.text(dc, a.footerCopy(), 32, 648, footerWidth, 22, a.smallFont, footerColor, 0x20|0x8000)
 	a.text(dc, "Ctrl + Alt + F12   暂停 / 恢复", 534, 648, 314, 22, a.smallFont, muted, 0x2|0x20)
 }
 
@@ -172,9 +176,12 @@ func (a *application) drawButton(d *drawItemStruct) {
 		return
 	}
 	id := int(d.ID)
-	text := map[int]string{idToggle: "暂停映射", idRecordSource: "录入按键", idRecordTarget: "录入按键", idAdd: "+ 添加映射", idDelete: "删除所选", idHelp: "使用帮助", idSupport: "支持与反馈 ↗", idProject: "GitHub 项目 ↗"}[id]
+	text := windowText(d.Hwnd)
 	if id == a.capturing {
 		text = "取消录入"
+	}
+	if id == idAdd && a.editing {
+		text = "保存修改"
 	}
 	bg, fg, border := canvasColor, muted, canvasColor
 	if id == idAdd {
@@ -280,11 +287,10 @@ func (a *application) drawList(d *listCustomDraw) uintptr {
 		a.text(d.Draw.DC, "→", x+356, top, 30, h, a.font, muted, 0x4|0x20)
 		a.text(d.Draw.DC, keyCaption(row.Target), x+392, top, 270, h, a.font, ink, 0x4|0x20|0x8000)
 		pillX, pillY := x+680, top+(h-24)/2
-		label, fg, wash := "已暂停", muted, softColor
+		label, fg, wash := a.ruleStateLabel(row), muted, softColor
 		if row.Enabled {
-			label, fg, wash = "已启用", accentColor, accentWash
-			if !a.cfg.Enabled || a.capturing != 0 {
-				label, fg, wash = "已暂停", muted, softColor
+			if label == "已启用" {
+				fg, wash = accentColor, accentWash
 			}
 		}
 		a.box(d.Draw.DC, pillX, pillY, 82, 24, 10, wash, wash)
@@ -295,4 +301,23 @@ func (a *application) drawList(d *listCustomDraw) uintptr {
 		return 0x4
 	}
 	return 0
+}
+
+func (a *application) ruleStateLabel(r rule) string {
+	if !r.Enabled {
+		return "未勾选"
+	}
+	if a.inputFailureMessage != "" {
+		return "输入故障"
+	}
+	if a.capturing != 0 {
+		return "录入中"
+	}
+	if !a.cfg.Enabled {
+		return "全局暂停"
+	}
+	if a.configurationActive {
+		return "切换后生效"
+	}
+	return "已启用"
 }

@@ -197,6 +197,7 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if len(a.cfg.Rules) != 0 || send(a.controls[idList], lvmFirst+4, 0, 0) != 0 {
 		t.Fatal("delete did not remove native rule")
 	}
+	testAdvancedInterface(t, a)
 	// Native messages must hand outputs to the sender only after the hook
 	// callback returned, and a timed-out sender must never appear enabled.
 	received := make(chan []output, 1)

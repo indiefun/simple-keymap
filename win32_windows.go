@@ -40,6 +40,12 @@ var (
 	getWindowRect          = user32.NewProc("GetWindowRect")
 	getCursorPos           = user32.NewProc("GetCursorPos")
 	getFocus               = user32.NewProc("GetFocus")
+	getWindowText          = user32.NewProc("GetWindowTextW")
+	getWindowTextLength    = user32.NewProc("GetWindowTextLengthW")
+	openClipboard          = user32.NewProc("OpenClipboard")
+	closeClipboard         = user32.NewProc("CloseClipboard")
+	emptyClipboard         = user32.NewProc("EmptyClipboard")
+	setClipboardData       = user32.NewProc("SetClipboardData")
 	windowFromPoint        = user32.NewProc("WindowFromPoint")
 	adjustWindowRect       = user32.NewProc("AdjustWindowRectEx")
 	getSystemMetrics       = user32.NewProc("GetSystemMetrics")
@@ -68,6 +74,10 @@ var (
 	createMutex            = kernel32.NewProc("CreateMutexW")
 	closeHandle            = kernel32.NewProc("CloseHandle")
 	getCurrentProcessID    = kernel32.NewProc("GetCurrentProcessId")
+	globalAlloc            = kernel32.NewProc("GlobalAlloc")
+	globalLock             = kernel32.NewProc("GlobalLock")
+	globalUnlock           = kernel32.NewProc("GlobalUnlock")
+	globalFree             = kernel32.NewProc("GlobalFree")
 	createSolidBrush       = gdi32.NewProc("CreateSolidBrush")
 	createPen              = gdi32.NewProc("CreatePen")
 	selectObject           = gdi32.NewProc("SelectObject")
@@ -93,6 +103,8 @@ var (
 
 const (
 	wmDestroy      = 0x0002
+	wmSize         = 0x0005
+	wmActivateApp  = 0x001C
 	wmPaint        = 0x000F
 	wmClose        = 0x0010
 	wmEraseBkgnd   = 0x0014
@@ -208,6 +220,12 @@ func send(hwnd uintptr, msg uint32, w, l uintptr) uintptr {
 }
 func setText(hwnd uintptr, text string) {
 	setWindowText.Call(hwnd, uintptr(unsafe.Pointer(utf16(text))))
+}
+func windowText(hwnd uintptr) string {
+	n, _, _ := getWindowTextLength.Call(hwnd)
+	buffer := make([]uint16, n+1)
+	getWindowText.Call(hwnd, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
+	return syscall.UTF16ToString(buffer)
 }
 func showError(hwnd uintptr, text string) {
 	messageBox.Call(hwnd, uintptr(unsafe.Pointer(utf16(text))), uintptr(unsafe.Pointer(utf16(appTitle))), 0x10)

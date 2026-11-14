@@ -25,6 +25,8 @@ jobs:
           cache: false
       - name: Test Windows app
         shell: pwsh
+        env:
+          SIMPLE_KEYMAP_TEST_CLIPBOARD: '1'
         run: ./build.ps1 -TestOnly
       - uses: actions/setup-node@v6
         with:

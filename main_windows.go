@@ -30,7 +30,12 @@ const (
 	idDelete
 	idHelp
 	idSupport
-	idProject
+	idAbout
+	idEdit
+	idCancelEdit
+	idLocateRule
+	idRetrySave
+	idDiagnostics
 )
 
 type application struct {
@@ -58,6 +63,12 @@ type application struct {
 	modifiers                               map[string]bool
 	inputFailureMessage                     string
 	status                                  string
+	configSaveError                         string
+	editing                                 bool
+	editIndex                               int
+	draftSource, draftTarget                uintptr
+	configurationActive                     bool
+	info                                    *informationWindow
 }
 
 var app *application
@@ -201,7 +212,17 @@ func runMessageLoop(hwnd uintptr) {
 			break
 		}
 		// IsDialogMessage gives native tab/arrow navigation to our regular window.
-		handled, _, _ := isDialogMessage.Call(hwnd, uintptr(unsafe.Pointer(&msg)))
+		var handled uintptr
+		if app != nil && app.info != nil {
+			if msg.Message == 0x0100 && msg.WParam == 0x1B && app.ownInformationWindow(msg.Hwnd) {
+				app.closeInformation()
+				continue
+			}
+			handled, _, _ = isDialogMessage.Call(app.info.hwnd, uintptr(unsafe.Pointer(&msg)))
+		}
+		if handled == 0 {
+			handled, _, _ = isDialogMessage.Call(hwnd, uintptr(unsafe.Pointer(&msg)))
+		}
 		if handled == 0 {
 			translateMessage.Call(uintptr(unsafe.Pointer(&msg)))
 			dispatchMessage.Call(uintptr(unsafe.Pointer(&msg)))
@@ -233,6 +254,9 @@ func (a *application) create() error {
 		Background: a.background, ClassName: utf16(appClass)}
 	if r, _, err := registerClassEx.Call(uintptr(unsafe.Pointer(&wc))); r == 0 {
 		return fmt.Errorf("无法创建窗口：%v", err)
+	}
+	if err := a.registerInformationWindow(); err != nil {
+		return err
 	}
 	init := struct{ Size, Classes uint32 }{8, 1}
 	initCommonControls.Call(uintptr(unsafe.Pointer(&init)))
@@ -285,9 +309,14 @@ func (a *application) createControls() error {
 		{"BUTTON", "+ 添加映射", idAdd, 0xB, 688, 338, 160, 40},
 		{"SysListView32", "映射列表", idList, 0x1 | 0x4 | 0x8 | 0x40 | 0x4000, 40, 478, 800, 144},
 		{"BUTTON", "删除所选", idDelete, 0xB, 740, 400, 108, 30},
+		{"BUTTON", "编辑所选", idEdit, 0xB, 624, 400, 108, 30},
+		{"BUTTON", "取消修改", idCancelEdit, 0xB, 566, 338, 108, 40},
+		{"BUTTON", "定位已有规则", idLocateRule, 0xB, 552, 338, 124, 40},
+		{"BUTTON", "重试保存", idRetrySave, 0xB, 358, 642, 82, 30},
+		{"BUTTON", "复制诊断", idDiagnostics, 0xB, 448, 642, 82, 30},
 		{"BUTTON", "使用帮助", idHelp, 0xB, 776, 30, 72, 30},
 		{"BUTTON", "支持与反馈", idSupport, 0xB, 658, 30, 98, 30},
-		{"BUTTON", "GitHub 项目", idProject, 0xB, 522, 30, 116, 30},
+		{"BUTTON", "关于与许可", idAbout, 0xB, 522, 30, 116, 30},
 	}
 	for _, c := range types {
 		if _, err := a.control(c.class, c.text, c.id, c.style, c.x, c.y, c.w, c.h); err != nil {
@@ -325,10 +354,15 @@ func (a *application) createControls() error {
 		send(list, lvmFirst+3, 1, a.rowImages)
 	}
 	enableWindow.Call(a.controls[idDelete], 0)
+	enableWindow.Call(a.controls[idEdit], 0)
+	for _, id := range []int{idCancelEdit, idLocateRule, idRetrySave} {
+		showWindow.Call(a.controls[id], 0)
+	}
 	return nil
 }
 
 func (a *application) dispose() {
+	a.closeInformation()
 	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.keyFont, a.background, a.whiteBrush} {
 		if object != 0 {
 			deleteObject.Call(object)
@@ -345,6 +379,12 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			return 0
 		}
 		switch msg {
+		case wmActivateApp:
+			app.configurationActive = wParam != 0
+			app.refreshRuleStatuses()
+			invalidateRect.Call(app.hwnd, 0, 0)
+			invalidateRect.Call(app.controls[idList], 0, 0)
+			return 0
 		case wmPaint:
 			app.paint(hwnd)
 			return 0
@@ -367,8 +407,17 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			}
 			if h.ID == idList && int32(h.Code) == -101 && !app.updating {
 				app.readChecks()
-				selected := send(app.controls[idList], lvmFirst+12, ^uintptr(0), 0x2)
-				enableWindow.Call(app.controls[idDelete], boolArg(int32(selected) >= 0))
+				app.updateRuleActions()
+			}
+			if h.ID == idList && int32(h.Code) == -3 { // NM_DBLCLK
+				activation := messageData[struct {
+					Header        notifyHeader
+					Item, SubItem int32
+				}](&lParam)
+				if activation.Item >= 0 && int(activation.Item) < len(app.cfg.Rules) {
+					app.selectRule(int(activation.Item))
+					app.beginEditSelected()
+				}
 			}
 		case wmHotkey:
 			if app.inputFailureMessage != "" {
@@ -438,25 +487,26 @@ func (a *application) command(id int) {
 		a.cfg.Enabled = !a.cfg.Enabled
 		a.changed("已切换映射状态。")
 	case idAdd:
-		i, j := int32(send(a.controls[idSource], cbGetCurSel, 0, 0)), int32(send(a.controls[idTarget], cbGetCurSel, 0, 0))
-		if i < 0 || j < 0 {
-			return
-		}
-		r := rule{Source: keys[i].ID, Target: keys[j].ID, Enabled: true}
-		rules := append(append([]rule{}, a.cfg.Rules...), r)
-		if err := validateRules(rules); err != nil {
-			showError(a.hwnd, err.Error())
-			return
-		}
-		a.cfg.Rules = rules
-		a.changed("已添加：" + keyLabel(r.Source) + " → " + keyLabel(r.Target) + "。")
-		a.refreshList()
+		a.saveDraft()
+	case idEdit:
+		a.beginEditSelected()
+	case idCancelEdit:
+		a.cancelEdit()
+	case idLocateRule:
+		a.locateDraftRule()
+	case idRetrySave:
+		a.persistConfig()
+	case idDiagnostics:
+		a.copyDiagnostics()
 	case idDelete:
 		i := int32(send(a.controls[idList], lvmFirst+12, ^uintptr(0), 0x2))
 		if i < 0 || int(i) >= len(a.cfg.Rules) {
 			return
 		}
 		a.cfg.Rules = append(a.cfg.Rules[:i], a.cfg.Rules[i+1:]...)
+		if a.editing {
+			a.cancelEdit()
+		}
 		a.changed("已删除所选映射。")
 		a.refreshList()
 	case idRecordSource, idRecordTarget:
@@ -466,30 +516,11 @@ func (a *application) command(id int) {
 			a.startCapture(id)
 		}
 	case idHelp:
-		messageBox.Call(a.hwnd, uintptr(unsafe.Pointer(utf16(
-			"轻映 "+appVersion+"\n\n"+
-				"首次使用：已选好「鼠标侧键 1 → 鼠标中键」。\n"+
-				"点击「添加映射」，再切到其他应用试按即可。\n\n"+
-				"1. 在「按下这个键」中选择要替换的原按键。\n"+
-				"2. 在「变为这个键」中选择目标按键。\n"+
-				"3. 点击「添加映射」，切到其他应用使用。\n"+
-				"也可以点击「录入按键」后按一下；Esc 取消录入。\n"+
-				"列表左侧勾选启用，取消勾选暂停；选中一行可删除。\n\n"+
-				"按住原按键 = 持续按住目标按键，松开即释放。\n"+
-				"原按键原有的动作会被替换。\n"+
-				"Ctrl + Alt + F12：全局暂停 / 恢复。\n"+
-				"配置窗口内不执行映射，方便随时修改。\n"+
-				"最小化后继续生效；关闭窗口即停止映射并退出。\n\n"+
-				"只映射单个按键，不支持组合键、宏或滚轮滚动。\n"+
-				"目标程序以管理员运行时，轻映也需以管理员运行。\n"+
-				"部分游戏可能不接受模拟输入。\n\n"+
-				"免费开源 · GPL-3.0 · Copyright © 2026 Kevin Loo\n"+
-				"项目源码与许可："+repositoryURL+"\n\n"+
-				"配置自动保存至：\n"+a.path))), uintptr(unsafe.Pointer(utf16("轻映 · 使用说明"))), 0x40)
+		a.openInformation("help")
 	case idSupport:
-		a.openSupport()
-	case idProject:
-		a.openProject()
+		a.openInformation("support")
+	case idAbout:
+		a.openInformation("about")
 	}
 }
 
@@ -509,6 +540,7 @@ func (a *application) apply() {
 	for _, id := range []int{idSource, idTarget, idList, idRecordSource, idRecordTarget} {
 		invalidateRect.Call(a.controls[id], 0, 0)
 	}
+	a.refreshRuleStatuses()
 }
 
 func (a *application) draftHint() (string, bool) {
@@ -519,13 +551,19 @@ func (a *application) draftHint() (string, bool) {
 	if i == j {
 		return "两个按键相同，请换一个目标按键。", false
 	}
-	for _, r := range a.cfg.Rules {
+	for index, r := range a.cfg.Rules {
+		if a.editing && index == a.editIndex {
+			continue
+		}
 		if r.Source == keys[i].ID {
 			if r.Target == keys[j].ID {
 				return "这条映射已在下方列表中。", false
 			}
-			return "这个原按键已有映射，删除旧规则后可重新设置。", false
+			return "原按键已有映射，可定位后编辑。", false
 		}
+	}
+	if a.editing {
+		return "修改后点击「保存修改」，或取消保留原规则。", true
 	}
 	if !a.cfg.Enabled {
 		return "添加后，打开总开关并切到其他应用使用。", true
@@ -536,6 +574,12 @@ func (a *application) draftHint() (string, bool) {
 func (a *application) updateDraft() {
 	_, valid := a.draftHint()
 	enableWindow.Call(a.controls[idAdd], boolArg(valid && a.capturing == 0))
+	setText(a.controls[idAdd], "+ 添加映射")
+	if a.editing {
+		setText(a.controls[idAdd], "保存修改")
+	}
+	showWindow.Call(a.controls[idCancelEdit], boolArg(a.editing)*5)
+	showWindow.Call(a.controls[idLocateRule], boolArg(!a.editing && a.conflictingRule() >= 0)*5)
 	for _, id := range []int{idAdd, idSource, idTarget} {
 		invalidateRect.Call(a.controls[id], 0, 0)
 	}
@@ -545,13 +589,8 @@ func (a *application) updateDraft() {
 func (a *application) changed(message string) {
 	a.apply()
 	a.status = message
-	if a.inputFailureMessage != "" {
-		a.status = a.inputFailureMessage
-	}
-	if err := saveConfig(a.path, a.cfg); err != nil {
-		a.status = "当前已生效，但配置保存失败。"
-		showError(a.hwnd, "配置保存失败："+err.Error()+"\n\n当前映射仍然生效。")
-	}
+	a.persistConfig()
+	a.updateDraft()
 	invalidateRect.Call(a.hwnd, 0, 0)
 }
 
@@ -571,15 +610,12 @@ func (a *application) refreshList() {
 		send(list, lvmFirst+43, uintptr(i), uintptr(unsafe.Pointer(&item)))
 		item = listItem{SubItem: 1, Text: utf16("→    " + keyCaption(r.Target))}
 		send(list, lvmFirst+116, uintptr(i), uintptr(unsafe.Pointer(&item)))
-		status := "已暂停"
-		if r.Enabled {
-			status = "已启用"
-		}
-		item = listItem{SubItem: 2, Text: utf16(status)}
+		item = listItem{SubItem: 2, Text: utf16(a.ruleStateLabel(r))}
 		send(list, lvmFirst+116, uintptr(i), uintptr(unsafe.Pointer(&item)))
 	}
 	showWindow.Call(list, boolArg(len(a.cfg.Rules) != 0)*5)
 	enableWindow.Call(a.controls[idDelete], 0)
+	enableWindow.Call(a.controls[idEdit], 0)
 	a.updateDraft()
 	invalidateRect.Call(a.hwnd, 0, 0)
 }
@@ -595,24 +631,17 @@ func (a *application) readChecks() {
 	}
 	if changed {
 		a.changed("规则状态已更新。")
-		a.updating = true
-		for i, r := range a.cfg.Rules {
-			text := "已暂停"
-			if r.Enabled {
-				text = "已启用"
-			}
-			item := listItem{SubItem: 2, Text: utf16(text)}
-			send(a.controls[idList], lvmFirst+116, uintptr(i), uintptr(unsafe.Pointer(&item)))
-		}
-		a.updating = false
 	}
 }
 
 func (a *application) startCapture(id int) {
 	a.capturing = id
 	a.capturePending = false
+	if a.info != nil {
+		enableWindow.Call(a.info.hwnd, 0)
+	}
 	a.apply()
-	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idHelp, idSupport, idProject} {
+	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idEdit, idCancelEdit, idLocateRule, idHelp, idSupport, idAbout, idRetrySave, idDiagnostics} {
 		enableWindow.Call(a.controls[other], boolArg(other == id))
 	}
 	setText(a.controls[id], "取消录入")
@@ -635,15 +664,21 @@ func (a *application) finishCapture(index int) {
 	// recording state first so that repaint already sees the normal label.
 	a.capturing = 0
 	a.capturePending = false
+	if a.info != nil {
+		enableWindow.Call(a.info.hwnd, 1)
+	}
 	setText(a.controls[recordButton], "录入按键")
-	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp, idSupport, idProject} {
+	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp, idSupport, idAbout, idCancelEdit, idLocateRule, idRetrySave, idDiagnostics} {
 		enableWindow.Call(a.controls[id], 1)
 	}
-	selected := int32(send(a.controls[idList], lvmFirst+12, ^uintptr(0), 0x2))
-	enableWindow.Call(a.controls[idDelete], boolArg(selected >= 0))
+	a.updateRuleActions()
 	if index > 0 && index <= len(keys) {
 		send(a.controls[combo], cbSetCurSel, uintptr(index-1), 0)
-		a.status = "已录入：" + keys[index-1].Label + "。点击「添加映射」保存。"
+		action := "添加映射"
+		if a.editing {
+			action = "保存修改"
+		}
+		a.status = "已录入：" + keys[index-1].Label + "。点击「" + action + "」保存。"
 	} else {
 		a.status = "已取消录入。"
 	}
