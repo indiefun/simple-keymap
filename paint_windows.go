@@ -2,10 +2,7 @@
 
 package main
 
-import (
-	"fmt"
-	"unsafe"
-)
+import "unsafe"
 
 var (
 	ink          = rgb(31, 43, 47)
@@ -89,86 +86,49 @@ func (a *application) paint(hwnd uintptr) {
 	deleteDC.Call(buffer)
 }
 
-func (a *application) stateCopy() (string, string, uintptr, uintptr) {
-	if a.inputFailureMessage != "" {
-		return "输入已暂停", "输入服务遇到问题，点击右侧查看原因。", warningColor, rgb(251, 240, 224)
-	}
-	if a.capturing != 0 {
-		name := "原按键"
-		if a.capturing == idRecordTarget {
-			name = "目标按键"
-		}
-		return "正在录入" + name, "按一下键盘或鼠标按键，Esc 取消。", accentColor, accentWash
-	}
-	if !a.cfg.Enabled {
-		return "映射已暂停", "规则已保留，打开总开关即可恢复。", muted, rgb(237, 240, 238)
-	}
-	count := 0
-	for _, r := range a.cfg.Rules {
-		if r.Enabled {
-			count++
-		}
-	}
-	if count == 0 {
-		if len(a.cfg.Rules) == 0 {
-			return "添加第一条映射", "选好两个按键，点击「添加映射」。", accentColor, accentWash
-		}
-		return "规则均已暂停", "勾选下方规则，即可恢复对应映射。", muted, rgb(237, 240, 238)
-	}
-	if a.configurationActive {
-		return "配置窗口内暂不执行", fmt.Sprintf("%d 条规则待用 · 切到其他应用自动生效", count), accentColor, accentWash
-	}
-	return "映射已开启", fmt.Sprintf("%d 条规则已启用", count), accentColor, accentWash
-}
-
 func (a *application) paintContent(dc uintptr) {
-	drawIconEx.Call(dc, uintptr(a.px(30)), uintptr(a.px(24)), a.brandIcon, uintptr(a.px(44)), uintptr(a.px(44)), 0, 0, 3)
-	a.text(dc, "轻映", 86, 22, 180, 32, a.titleFont, ink, 0x20)
-	a.text(dc, "免费开源 · 键盘与鼠标改键", 87, 56, 320, 22, a.smallFont, muted, 0x20)
-	title, detail, color, wash := a.stateCopy()
-	a.box(dc, 32, 88, 816, 60, 14, wash, wash)
-	a.box(dc, 50, 108, 7, 7, 7, color, color)
-	a.text(dc, title, 68, 98, 570, 25, a.font, color, 0x20)
-	a.text(dc, detail, 68, 124, 600, 21, a.smallFont, muted, 0x20|0x8000)
-	heading := "新建映射"
-	if a.editing {
-		heading = "修改映射"
-	}
-	a.text(dc, heading, 32, 174, 240, 28, a.headingFont, ink, 0x20)
-	a.text(dc, "按下这个键", 32, 212, 270, 22, a.font, muted, 0x20)
-	a.text(dc, "变为这个键", 480, 212, 270, 22, a.font, muted, 0x20)
-	a.box(dc, 423, 264, 34, 34, 34, softColor, softColor)
-	a.line(dc, 433, 281, 448, 281, accentColor, 1)
-	a.line(dc, 443, 276, 448, 281, accentColor, 1)
-	a.line(dc, 443, 286, 448, 281, accentColor, 1)
-	hint, _ := a.draftHint()
-	a.text(dc, hint, 32, 350, 512, 24, a.smallFont, muted, 0x20|0x8000)
-	a.line(dc, 32, 393, 848, 393, lineColor, 1)
-	a.text(dc, "我的映射", 32, 406, 140, 28, a.headingFont, ink, 0x20)
-	a.box(dc, 120, 408, 30, 22, 10, rgb(232, 237, 233), rgb(232, 237, 233))
-	a.text(dc, fmt.Sprint(len(a.cfg.Rules)), 120, 408, 30, 22, a.smallFont, muted, 0x1|0x4|0x20)
-	a.box(dc, 32, 446, 816, 186, 14, surfaceColor, lineColor)
+	w, h := a.clientSize(a.hwnd)
+	drawIconEx.Call(dc, uintptr(a.px(32)), uintptr(a.px(24)), a.brandIcon, uintptr(a.px(40)), uintptr(a.px(40)), 0, 0, 3)
+	a.text(dc, "轻映", 84, 22, 200, 30, a.titleFont, ink, 0x20)
+	a.text(dc, "免费开源 · 键盘与鼠标改键", 85, 55, 350, 22, a.smallFont, muted, 0x20)
+	a.line(dc, 32, 86, w-32, 86, lineColor, 1)
+	title, detail, color, _ := a.stateCopy()
+	a.text(dc, title, 32, 104, w-220, 30, a.headingFont, color, 0x20)
+	a.text(dc, detail, 32, 140, w-64, 24, a.smallFont, muted, 0x20|0x8000)
 	if len(a.cfg.Rules) == 0 {
-		a.box(dc, 416, 480, 48, 42, 12, softColor, softColor)
-		a.keyIcon(dc, 428, 489, false, muted)
-		a.text(dc, "选两个按键，添加你的第一条映射", 64, 536, 752, 28, a.font, ink, 0x1|0x20)
-		a.text(dc, "点击「添加映射」，再切换到其他应用试按。", 64, 570, 752, 24, a.smallFont, muted, 0x1|0x20)
+		a.box(dc, w/2-28, 212, 56, 48, 14, accentWash, accentWash)
+		a.text(dc, "→", w/2-28, 212, 56, 48, a.titleFont, accentColor, 0x1|0x4|0x20)
+		a.text(dc, "先添加你的第一条映射", 32, 279, w-64, 30, a.headingFont, ink, 0x1|0x20)
+		a.text(dc, "告诉轻映：你想按哪个键，让它代替哪个键。", 32, 312, w-64, 24, a.font, muted, 0x1|0x20)
+		a.text(dc, "例如，按鼠标侧键，代替按下滚轮。", 32, 442, w-64, 24, a.smallFont, muted, 0x1|0x20)
 	} else {
-		a.text(dc, "启用 / 原按键", 58, 455, 320, 22, a.smallFont, muted, 0x20)
-		a.text(dc, "映射为", 432, 455, 280, 22, a.smallFont, muted, 0x20)
-		a.text(dc, "状态", 736, 455, 90, 22, a.smallFont, muted, 0x20)
-		a.line(dc, 48, 478, 832, 478, lineColor, 1)
+		a.text(dc, "轻映自己的窗口内不改键，方便你修改配置。", 32, 170, w-64, 22, a.smallFont, muted, 0x20)
+		if a.successMessage != "" {
+			a.box(dc, 32, 198, w-64, 66, 12, accentWash, accentWash)
+			a.text(dc, a.successMessage, 48, 207, w-340, 23, a.font, accentColor, 0x20|0x8000)
+			note := "切换到其他应用试按；最小化后仍会运行。"
+			if !a.successActive {
+				note = "规则已保存，恢复全部或开启该条规则后再试按。"
+			}
+			a.text(dc, note, 48, 236, w-96, 22, a.smallFont, muted, 0x20|0x8000)
+		}
+		a.text(dc, "我的映射", 32, a.listTop()-44, 300, 28, a.headingFont, ink, 0x20)
 	}
-	footerColor := muted
 	if a.configSaveError != "" {
-		footerColor = warningColor
+		a.text(dc, "当前更改尚未保存，可重试。", 32, h-84, 260, 24, a.smallFont, warningColor, 0x20)
+	} else if a.status != "" {
+		a.text(dc, a.status, 32, h-84, w-180, 24, a.smallFont, muted, 0x20|0x8000)
 	}
-	footerWidth := 408
+	a.line(dc, 32, h-54, w-32, h-54, lineColor, 1)
+	footer := "配置自动保存在本机"
+	fg := muted
 	if a.configSaveError != "" {
-		footerWidth = 318
+		footer = "更改仅本次生效，尚未保存"
+		fg = warningColor
 	}
-	a.text(dc, a.footerCopy(), 32, 648, footerWidth, 22, a.smallFont, footerColor, 0x20|0x8000)
-	a.text(dc, "Ctrl + Alt + F12   暂停 / 恢复", 534, 648, 314, 22, a.smallFont, muted, 0x2|0x20)
+	a.text(dc, footer, 32, h-42, 260, 24, a.smallFont, fg, 0x20)
+	a.text(dc, "Ctrl + Alt + F12 · 暂停 / 恢复", w-470, h-42, 250, 24, a.smallFont, muted, 0x20)
+	a.text(dc, "最小化继续 · 关闭退出", w-224, h-42, 192, 24, a.smallFont, muted, 0x2|0x20)
 }
 
 func (a *application) drawButton(d *drawItemStruct) {
@@ -176,148 +136,101 @@ func (a *application) drawButton(d *drawItemStruct) {
 		return
 	}
 	id := int(d.ID)
-	text := windowText(d.Hwnd)
-	if id == a.capturing {
-		text = "取消录入"
-	}
-	if id == idAdd && a.editing {
-		text = "保存修改"
-	}
-	bg, fg, border := canvasColor, muted, canvasColor
-	if id == idAdd {
+	primary := id == idNew || id == idAdd || id == idTryNow
+	bg, fg, border := canvasColor, accentColor, canvasColor
+	if primary {
 		bg, fg, border = accentColor, surfaceColor, accentColor
 	}
-	if id == idRecordSource || id == idRecordTarget {
-		fg = accentColor
+	if id == idToggle {
+		bg, border = surfaceColor, lineColor
 	}
-	if d.State&0x1 != 0 {
-		if id == idAdd {
-			bg, border = rgb(16, 83, 66), rgb(16, 83, 66)
-		} else {
-			bg, border = softColor, softColor
+	if id >= rowActionBase {
+		bg, border = surfaceColor, surfaceColor
+		index, action := (id-rowActionBase)/3, (id-rowActionBase)%3
+		if index < len(a.cfg.Rules) && action == 0 {
+			if a.cfg.Rules[index].Enabled {
+				bg, border = accentWash, accentWash
+			} else {
+				bg, fg, border = softColor, muted, softColor
+			}
 		}
 	}
-	if d.State&0x4 != 0 {
-		bg, fg, border = canvasColor, rgb(174, 182, 177), canvasColor
+	if d.State&1 != 0 {
+		if primary {
+			bg, border = rgb(16, 83, 66), rgb(16, 83, 66)
+		} else {
+			bg, border = accentWash, accentWash
+		}
 	}
-	if id == idAdd && d.State&0x4 != 0 {
-		bg, border = rgb(229, 234, 230), rgb(229, 234, 230)
+	if d.State&4 != 0 {
+		bg, fg, border = canvasColor, rgb(174, 182, 177), canvasColor
 	}
 	if d.State&0x10 != 0 {
 		border = accentColor
 	}
-	if id == idToggle {
-		_, _, _, wash := a.stateCopy()
-		b, _, _ := createSolidBrush.Call(wash)
-		fillRect.Call(d.DC, uintptr(unsafe.Pointer(&d.Rect)), b)
-		deleteObject.Call(b)
-		if a.inputFailureMessage != "" {
-			bg, border = rgb(255, 249, 240), rgb(243, 222, 193)
-		}
-	} else {
-		fillRect.Call(d.DC, uintptr(unsafe.Pointer(&d.Rect)), a.background)
-	}
+	fillRect.Call(d.DC, uintptr(unsafe.Pointer(&d.Rect)), a.background)
 	w, h := int(d.Rect.Right)*96/a.dpi, int(d.Rect.Bottom)*96/a.dpi
-	if id == idToggle && a.inputFailureMessage == "" {
-		_, _, _, wash := a.stateCopy()
-		b, _, _ := createSolidBrush.Call(wash)
-		fillRect.Call(d.DC, uintptr(unsafe.Pointer(&d.Rect)), b)
-		deleteObject.Call(b)
-		a.text(d.DC, "总开关", 0, 0, w-54, h, a.smallFont, muted, 0x4|0x20)
-		track, knob := rgb(182, 192, 186), w-44
-		if a.cfg.Enabled {
-			track, knob = accentColor, w-27
+	if id >= rowActionBase && (id-rowActionBase)%3 == 0 {
+		index := (id - rowActionBase) / 3
+		if index < len(a.cfg.Rules) {
+			on := a.cfg.Rules[index].Enabled
+			track, knob := rgb(174, 187, 178), 5
+			if on {
+				track, knob = accentColor, 17
+			}
+			a.box(d.DC, 2, (h-18)/2, 30, 18, 18, track, track)
+			a.box(d.DC, knob, (h-12)/2, 12, 12, 12, surfaceColor, surfaceColor)
+			a.text(d.DC, ruleEnabledText(a.cfg.Rules[index]), 38, 0, w-38, h, a.smallFont, fg, 0x4|0x20)
+			if d.State&0x10 != 0 {
+				a.line(d.DC, 2, h-2, w-2, h-2, accentColor, 1)
+			}
+			return
 		}
-		if d.State&0x4 != 0 {
-			track = rgb(186, 203, 193)
+	}
+	a.box(d.DC, 0, 0, w, h, 9, bg, border)
+	label := windowText(d.Hwnd)
+	if id >= rowActionBase {
+		if (id-rowActionBase)%3 == 1 {
+			label = "修改"
+		} else {
+			label = "⋯"
 		}
-		a.box(d.DC, w-47, (h-24)/2, 44, 24, 24, track, track)
-		a.box(d.DC, knob, (h-18)/2, 18, 18, 18, surfaceColor, surfaceColor)
-		if d.State&0x10 != 0 {
-			a.line(d.DC, 0, h-1, w-54, h-1, accentColor, 1)
-		}
-		return
 	}
-	if id == idToggle {
-		text, fg = "查看原因", warningColor
-	}
-	a.box(d.DC, 0, 0, w, h, 10, bg, border)
-	font := a.font
-	if id != idAdd {
-		font = a.smallFont
-	}
-	a.textRect(d.DC, text, &d.Rect, font, fg, 0x1|0x4|0x20)
+	a.textRect(d.DC, label, &d.Rect, a.smallFont, fg, 0x1|0x4|0x20)
 }
 
 func (a *application) drawList(d *listCustomDraw) uintptr {
-	const itemPrepaint = 0x10001
-	switch d.Draw.Stage {
-	case 1:
+	if d.Draw.Stage == 1 {
 		return 0x20
-	case itemPrepaint:
-		i := int(d.Draw.Item)
-		if i < 0 || i >= len(a.cfg.Rules) {
-			return 0
-		}
-		// Classic common controls may omit rc in an item draw notification.
-		r := rect{}
-		send(a.controls[idList], lvmFirst+14, uintptr(i), uintptr(unsafe.Pointer(&r)))
-		bg := surfaceColor
-		selected := send(a.controls[idList], lvmFirst+44, uintptr(i), 2) != 0
-		if selected {
-			bg = softColor
-		}
-		b, _, _ := createSolidBrush.Call(bg)
-		fillRect.Call(d.Draw.DC, uintptr(unsafe.Pointer(&r)), b)
-		deleteObject.Call(b)
-		x, top := int(r.Left)*96/a.dpi, int(r.Top)*96/a.dpi
-		h := int(r.Bottom-r.Top) * 96 / a.dpi
-		row := a.cfg.Rules[i]
-		checkBG, checkBorder := surfaceColor, rgb(171, 185, 176)
-		if row.Enabled {
-			checkBG, checkBorder = accentColor, accentColor
-		}
-		a.box(d.Draw.DC, x+6, top+(h-14)/2, 14, 14, 4, checkBG, checkBorder)
-		if row.Enabled {
-			y := top + (h-14)/2
-			a.line(d.Draw.DC, x+9, y+7, x+12, y+10, surfaceColor, 1)
-			a.line(d.Draw.DC, x+12, y+10, x+17, y+4, surfaceColor, 1)
-		}
-		a.text(d.Draw.DC, keyCaption(row.Source), x+34, top, 310, h, a.font, ink, 0x4|0x20|0x8000)
-		a.text(d.Draw.DC, "→", x+356, top, 30, h, a.font, muted, 0x4|0x20)
-		a.text(d.Draw.DC, keyCaption(row.Target), x+392, top, 270, h, a.font, ink, 0x4|0x20|0x8000)
-		pillX, pillY := x+680, top+(h-24)/2
-		label, fg, wash := a.ruleStateLabel(row), muted, softColor
-		if row.Enabled {
-			if label == "已启用" {
-				fg, wash = accentColor, accentWash
-			}
-		}
-		a.box(d.Draw.DC, pillX, pillY, 82, 24, 10, wash, wash)
-		a.text(d.Draw.DC, label, pillX, pillY, 82, 24, a.smallFont, fg, 0x1|0x4|0x20)
-		if i < len(a.cfg.Rules)-1 {
-			a.line(d.Draw.DC, x+6, top+h-1, x+782, top+h-1, softColor, 1)
-		}
-		return 0x4
 	}
-	return 0
-}
-
-func (a *application) ruleStateLabel(r rule) string {
-	if !r.Enabled {
-		return "未勾选"
+	if d.Draw.Stage != 0x10001 {
+		return 0
 	}
-	if a.inputFailureMessage != "" {
-		return "输入故障"
+	i := int(d.Draw.Item)
+	if i < 0 || i >= len(a.cfg.Rules) {
+		return 0
 	}
-	if a.capturing != 0 {
-		return "录入中"
+	var r rect
+	send(a.controls[idList], lvmFirst+14, uintptr(i), uintptr(unsafe.Pointer(&r)))
+	w, _ := a.clientSize(a.controls[idList])
+	top := int(r.Top) * 96 / a.dpi
+	h := int(r.Bottom-r.Top) * 96 / a.dpi
+	fillRect.Call(d.Draw.DC, uintptr(unsafe.Pointer(&r)), a.whiteBrush)
+	bg := surfaceColor
+	if send(a.controls[idList], lvmFirst+44, uintptr(i), 2) != 0 {
+		bg = softColor
 	}
-	if !a.cfg.Enabled {
-		return "全局暂停"
+	a.box(d.Draw.DC, 4, top+3, w-26, h-6, 12, bg, lineColor)
+	widths := a.listWidths()
+	row := a.cfg.Rules[i]
+	fg := ink
+	if !row.Enabled {
+		fg = muted
 	}
-	if a.configurationActive {
-		return "切换后生效"
-	}
-	return "已启用"
+	a.text(d.Draw.DC, keyCaption(row.Source), 20, top+17, widths[0]-50, 26, a.font, fg, 0x20|0x8000)
+	a.text(d.Draw.DC, keyDetail(row.Source), 20, top+47, widths[0]-50, 20, a.smallFont, muted, 0x20|0x8000)
+	a.text(d.Draw.DC, "→", widths[0]-24, top+24, 24, 26, a.font, muted, 0x20)
+	a.text(d.Draw.DC, keyCaption(row.Target), widths[0]+10, top+17, widths[1]-20, 26, a.font, fg, 0x20|0x8000)
+	a.text(d.Draw.DC, keyDetail(row.Target), widths[0]+10, top+47, widths[1]-20, 20, a.smallFont, muted, 0x20|0x8000)
+	return 0x4
 }

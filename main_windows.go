@@ -15,14 +15,12 @@ import (
 )
 
 const (
-	windowWidth  = 880
-	windowHeight = 680
+	windowWidth  = 900
+	windowHeight = 650
 )
 
 const (
-	idSource = 101 + iota
-	idTarget
-	idRecordSource
+	idRecordSource = 101 + iota
 	idRecordTarget
 	idAdd
 	idToggle
@@ -32,10 +30,13 @@ const (
 	idSupport
 	idAbout
 	idEdit
-	idCancelEdit
-	idLocateRule
 	idRetrySave
-	idDiagnostics
+	idNew
+	idPreset
+	idHelpMenu
+	idUndo
+	idTryNow
+	idDismissSuccess
 )
 
 type application struct {
@@ -45,6 +46,7 @@ type application struct {
 	keyFont                                 uintptr
 	brandIcon                               uintptr
 	background, whiteBrush                  uintptr
+	accentBrush                             uintptr
 	rowImages                               uintptr
 	dpi                                     int
 	cfg                                     config
@@ -64,11 +66,16 @@ type application struct {
 	inputFailureMessage                     string
 	status                                  string
 	configSaveError                         string
-	editing                                 bool
-	editIndex                               int
-	draftSource, draftTarget                uintptr
 	configurationActive                     bool
 	info                                    *informationWindow
+	editor                                  *mappingEditor
+	captureIndex                            int
+	captureGeneration                       uintptr
+	deletedRule                             *rule
+	deletedIndex                            int
+	successMessage                          string
+	successActive                           bool
+	rowActions                              map[int][3]uintptr
 }
 
 var app *application
@@ -200,6 +207,7 @@ func (a *application) beginShutdown() {
 		return
 	}
 	a.closing = true
+	a.closeEditor(true)
 	killTimer.Call(a.hwnd, 1)
 	a.stopHooks()
 }
@@ -213,6 +221,19 @@ func runMessageLoop(hwnd uintptr) {
 		}
 		// IsDialogMessage gives native tab/arrow navigation to our regular window.
 		var handled uintptr
+		if app != nil && app.editor != nil && app.editorOwns(msg.Hwnd) {
+			if msg.Message == 0x0100 && msg.WParam == 0x1B {
+				app.requestCloseEditor()
+				continue
+			}
+			// The recorder swallows both edges before posting completion. Never
+			// let its key-up become a dialog action (in particular Enter).
+			if msg.Message == 0x0100 && msg.WParam == 0x0D {
+				app.editorEnter()
+				continue
+			}
+			handled, _, _ = isDialogMessage.Call(app.editor.hwnd, uintptr(unsafe.Pointer(&msg)))
+		}
 		if app != nil && app.info != nil {
 			if msg.Message == 0x0100 && msg.WParam == 0x1B && app.ownInformationWindow(msg.Hwnd) {
 				app.closeInformation()
@@ -245,6 +266,7 @@ func (a *application) create() error {
 	a.keyFont = a.makeFont(19, 600)
 	a.background, _, _ = createSolidBrush.Call(canvasColor)
 	a.whiteBrush, _, _ = createSolidBrush.Call(rgb(255, 255, 255))
+	a.accentBrush, _, _ = createSolidBrush.Call(accentWash)
 	cursor, _, _ := loadCursor.Call(0, 32512)
 	icon := loadBrandIcon(a.instance, a.px(32))
 	smallIcon := loadBrandIcon(a.instance, a.px(16))
@@ -258,9 +280,12 @@ func (a *application) create() error {
 	if err := a.registerInformationWindow(); err != nil {
 		return err
 	}
+	if err := a.registerEditorWindow(); err != nil {
+		return err
+	}
 	init := struct{ Size, Classes uint32 }{8, 1}
 	initCommonControls.Call(uintptr(unsafe.Pointer(&init)))
-	style := uintptr(0x00C80000 | 0x00080000 | 0x00020000 | wsClipChildren) // Caption, menu, minimize.
+	style := uintptr(0x00CC0000 | 0x00080000 | 0x00020000 | wsClipChildren)
 	r := rect{Right: int32(a.px(windowWidth)), Bottom: int32(a.px(windowHeight))}
 	adjustWindowRect.Call(uintptr(unsafe.Pointer(&r)), style, 0, 0)
 	w, h := int(r.Right-r.Left), int(r.Bottom-r.Top)
@@ -292,396 +317,4 @@ func (a *application) control(class, text string, id int, style uintptr, x, y, w
 	a.controls[id] = hwnd
 	send(hwnd, wmSetFont, a.font, 1)
 	return hwnd, nil
-}
-
-func (a *application) createControls() error {
-	types := []struct {
-		class, text string
-		id          int
-		style       uintptr
-		x, y, w, h  int
-	}{
-		{"BUTTON", "暂停映射", idToggle, 0xB, 684, 102, 144, 32},
-		{"COMBOBOX", "按下这个键", idSource, 0x3 | wsVscroll, 32, 242, 368, 370},
-		{"BUTTON", "录入按键", idRecordSource, 0xB, 308, 204, 92, 28},
-		{"COMBOBOX", "变为这个键", idTarget, 0x3 | wsVscroll, 480, 242, 368, 370},
-		{"BUTTON", "录入按键", idRecordTarget, 0xB, 756, 204, 92, 28},
-		{"BUTTON", "+ 添加映射", idAdd, 0xB, 688, 338, 160, 40},
-		{"SysListView32", "映射列表", idList, 0x1 | 0x4 | 0x8 | 0x40 | 0x4000, 40, 478, 800, 144},
-		{"BUTTON", "删除所选", idDelete, 0xB, 740, 400, 108, 30},
-		{"BUTTON", "编辑所选", idEdit, 0xB, 624, 400, 108, 30},
-		{"BUTTON", "取消修改", idCancelEdit, 0xB, 566, 338, 108, 40},
-		{"BUTTON", "定位已有规则", idLocateRule, 0xB, 552, 338, 124, 40},
-		{"BUTTON", "重试保存", idRetrySave, 0xB, 358, 642, 82, 30},
-		{"BUTTON", "复制诊断", idDiagnostics, 0xB, 448, 642, 82, 30},
-		{"BUTTON", "使用帮助", idHelp, 0xB, 776, 30, 72, 30},
-		{"BUTTON", "支持与反馈", idSupport, 0xB, 658, 30, 98, 30},
-		{"BUTTON", "关于与许可", idAbout, 0xB, 522, 30, 116, 30},
-	}
-	for _, c := range types {
-		if _, err := a.control(c.class, c.text, c.id, c.style, c.x, c.y, c.w, c.h); err != nil {
-			return err
-		}
-	}
-	for _, id := range []int{idSource, idTarget} {
-		for _, k := range keys {
-			send(a.controls[id], cbAddString, 0, uintptr(unsafe.Pointer(utf16(k.Label))))
-		}
-		send(a.controls[id], 0x0153, 0, uintptr(a.px(28))) // CB_SETITEMHEIGHT, list items.
-		send(a.controls[id], 0x0153, ^uintptr(0), uintptr(a.px(70)))
-		send(a.controls[id], 0x0161, 12, 0) // CB_SETMINVISIBLE.
-		setWindowTheme.Call(a.controls[id], uintptr(unsafe.Pointer(utf16("Explorer"))), 0)
-		setWindowSubclass.Call(a.controls[id], pickerCallback, uintptr(id), 0)
-	}
-	send(a.controls[idSource], cbSetCurSel, 0, 0)
-	send(a.controls[idTarget], cbSetCurSel, 2, 0)
-	list := a.controls[idList]
-	setWindowTheme.Call(list, uintptr(unsafe.Pointer(utf16("Explorer"))), 0)
-	setWindowSubclass.Call(list, listCallback, idList, 0)
-	send(list, lvmFirst+54, 0, 0x4|0x20|0x10000) // Checkboxes, full-row select, double buffering.
-	send(list, lvmFirst+1, 0, rgb(255, 255, 255))
-	send(list, lvmFirst+36, 0, rgb(38, 48, 62))
-	send(list, lvmFirst+38, 0, rgb(255, 255, 255))
-	for i, c := range []struct {
-		text  string
-		width int
-	}{{"按下这个键", 352}, {"变为", 320}, {"状态", 110}} {
-		col := listColumn{Mask: 0x1 | 0x2 | 0x4, Text: utf16(c.text), Width: int32(a.px(c.width))}
-		send(list, lvmFirst+97, uintptr(i), uintptr(unsafe.Pointer(&col)))
-	}
-	a.rowImages, _, _ = imageListCreate.Call(1, uintptr(a.px(47)), 0x20, 1, 1)
-	if a.rowImages != 0 {
-		send(list, lvmFirst+3, 1, a.rowImages)
-	}
-	enableWindow.Call(a.controls[idDelete], 0)
-	enableWindow.Call(a.controls[idEdit], 0)
-	for _, id := range []int{idCancelEdit, idLocateRule, idRetrySave} {
-		showWindow.Call(a.controls[id], 0)
-	}
-	return nil
-}
-
-func (a *application) dispose() {
-	a.closeInformation()
-	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.keyFont, a.background, a.whiteBrush} {
-		if object != 0 {
-			deleteObject.Call(object)
-		}
-	}
-	if a.rowImages != 0 {
-		imageListDestroy.Call(a.rowImages)
-	}
-}
-
-func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
-	if app != nil {
-		if app.closing && (msg == wmInputError || msg == wmSendOutput || msg == wmCaptured || msg == wmHotkey) {
-			return 0
-		}
-		switch msg {
-		case wmActivateApp:
-			app.configurationActive = wParam != 0
-			app.refreshRuleStatuses()
-			invalidateRect.Call(app.hwnd, 0, 0)
-			invalidateRect.Call(app.controls[idList], 0, 0)
-			return 0
-		case wmPaint:
-			app.paint(hwnd)
-			return 0
-		case wmEraseBkgnd:
-			return 1
-		case wmDrawItem:
-			app.drawButton(messageData[drawItemStruct](&lParam))
-			return 1
-		case wmCommand:
-			if wParam>>16 == 0 {
-				app.command(int(wParam & 0xFFFF))
-			} else if wParam>>16 == 1 && (int(wParam&0xFFFF) == idSource || int(wParam&0xFFFF) == idTarget) {
-				app.updateDraft()
-			}
-			return 0
-		case wmNotify:
-			h := messageData[notifyHeader](&lParam)
-			if h.ID == idList && int32(h.Code) == -12 {
-				return app.drawList(messageData[listCustomDraw](&lParam))
-			}
-			if h.ID == idList && int32(h.Code) == -101 && !app.updating {
-				app.readChecks()
-				app.updateRuleActions()
-			}
-			if h.ID == idList && int32(h.Code) == -3 { // NM_DBLCLK
-				activation := messageData[struct {
-					Header        notifyHeader
-					Item, SubItem int32
-				}](&lParam)
-				if activation.Item >= 0 && int(activation.Item) < len(app.cfg.Rules) {
-					app.selectRule(int(activation.Item))
-					app.beginEditSelected()
-				}
-			}
-		case wmHotkey:
-			if app.inputFailureMessage != "" {
-				app.status = app.inputFailureMessage
-				invalidateRect.Call(app.hwnd, 0, 0)
-				return 0
-			}
-			if app.capturing != 0 {
-				app.finishCapture(0)
-			}
-			app.cfg.Enabled = !app.cfg.Enabled
-			app.changed("已切换映射状态。")
-			return 0
-		case wmCaptured:
-			app.finishCapture(int(wParam))
-			return 0
-		case wmTimer:
-			if wParam == 1 {
-				app.finishCapture(0)
-			}
-			return 0
-		case wmInputError:
-			if app.inputFailureMessage != "" {
-				return 0
-			}
-			app.cfg.Enabled = false
-			message := "映射已暂停：无法发送按键。目标程序若以管理员运行，请用相同权限启动轻映。"
-			if wParam == inputTimedOut {
-				message = "映射已暂停：Windows 输入发送超时。请保存工作并重启 Windows，再开启映射。"
-			} else if wParam == inputServiceLost {
-				message = "映射已暂停：输入服务已退出，请重新启动轻映。"
-			}
-			app.inputFailureMessage = message
-			app.changed(message)
-			return 0
-		case wmSendOutput:
-			// This posted message runs after the physical hook has returned.
-			app.flushOutput()
-			return 0
-		case wmClose:
-			app.beginShutdown()
-			destroyWindow.Call(hwnd)
-			return 0
-		case wmDestroy:
-			postQuitMessage.Call(0)
-			return 0
-		}
-	}
-	r, _, _ := defWindowProc.Call(hwnd, uintptr(msg), wParam, lParam)
-	return r
-}
-
-func boolArg(b bool) uintptr {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-func (a *application) command(id int) {
-	switch id {
-	case idToggle:
-		if a.inputFailureMessage != "" {
-			showError(a.hwnd, a.inputFailureMessage)
-			return
-		}
-		a.cfg.Enabled = !a.cfg.Enabled
-		a.changed("已切换映射状态。")
-	case idAdd:
-		a.saveDraft()
-	case idEdit:
-		a.beginEditSelected()
-	case idCancelEdit:
-		a.cancelEdit()
-	case idLocateRule:
-		a.locateDraftRule()
-	case idRetrySave:
-		a.persistConfig()
-	case idDiagnostics:
-		a.copyDiagnostics()
-	case idDelete:
-		i := int32(send(a.controls[idList], lvmFirst+12, ^uintptr(0), 0x2))
-		if i < 0 || int(i) >= len(a.cfg.Rules) {
-			return
-		}
-		a.cfg.Rules = append(a.cfg.Rules[:i], a.cfg.Rules[i+1:]...)
-		if a.editing {
-			a.cancelEdit()
-		}
-		a.changed("已删除所选映射。")
-		a.refreshList()
-	case idRecordSource, idRecordTarget:
-		if a.capturing != 0 {
-			a.finishCapture(0)
-		} else {
-			a.startCapture(id)
-		}
-	case idHelp:
-		a.openInformation("help")
-	case idSupport:
-		a.openInformation("support")
-	case idAbout:
-		a.openInformation("about")
-	}
-}
-
-func (a *application) apply() {
-	a.emit(a.engine.configure(a.cfg.Enabled && a.capturing == 0 && a.inputFailureMessage == "" && !a.closing, a.cfg.Rules))
-	if a.inputFailureMessage != "" {
-		setText(a.controls[idToggle], "查看原因")
-	} else if a.cfg.Enabled {
-		setText(a.controls[idToggle], "暂停映射")
-	} else {
-		setText(a.controls[idToggle], "开启映射")
-	}
-	invalidateRect.Call(a.hwnd, 0, 0)
-	invalidateRect.Call(a.controls[idToggle], 0, 0)
-	// Owner-drawn recording buttons depend on capturing as well as their
-	// native text. Repaint them even if EnableWindow did not change state.
-	for _, id := range []int{idSource, idTarget, idList, idRecordSource, idRecordTarget} {
-		invalidateRect.Call(a.controls[id], 0, 0)
-	}
-	a.refreshRuleStatuses()
-}
-
-func (a *application) draftHint() (string, bool) {
-	i, j := int32(send(a.controls[idSource], cbGetCurSel, 0, 0)), int32(send(a.controls[idTarget], cbGetCurSel, 0, 0))
-	if i < 0 || j < 0 {
-		return "选择两个按键，开始创建映射。", false
-	}
-	if i == j {
-		return "两个按键相同，请换一个目标按键。", false
-	}
-	for index, r := range a.cfg.Rules {
-		if a.editing && index == a.editIndex {
-			continue
-		}
-		if r.Source == keys[i].ID {
-			if r.Target == keys[j].ID {
-				return "这条映射已在下方列表中。", false
-			}
-			return "原按键已有映射，可定位后编辑。", false
-		}
-	}
-	if a.editing {
-		return "修改后点击「保存修改」，或取消保留原规则。", true
-	}
-	if !a.cfg.Enabled {
-		return "添加后，打开总开关并切到其他应用使用。", true
-	}
-	return "添加后，切换到其他应用即可使用。", true
-}
-
-func (a *application) updateDraft() {
-	_, valid := a.draftHint()
-	enableWindow.Call(a.controls[idAdd], boolArg(valid && a.capturing == 0))
-	setText(a.controls[idAdd], "+ 添加映射")
-	if a.editing {
-		setText(a.controls[idAdd], "保存修改")
-	}
-	showWindow.Call(a.controls[idCancelEdit], boolArg(a.editing)*5)
-	showWindow.Call(a.controls[idLocateRule], boolArg(!a.editing && a.conflictingRule() >= 0)*5)
-	for _, id := range []int{idAdd, idSource, idTarget} {
-		invalidateRect.Call(a.controls[id], 0, 0)
-	}
-	invalidateRect.Call(a.hwnd, 0, 0)
-}
-
-func (a *application) changed(message string) {
-	a.apply()
-	a.status = message
-	a.persistConfig()
-	a.updateDraft()
-	invalidateRect.Call(a.hwnd, 0, 0)
-}
-
-func (a *application) refreshList() {
-	a.updating = true
-	defer func() { a.updating = false }()
-	list := a.controls[idList]
-	send(list, lvmFirst+9, 0, 0)
-	for i, r := range a.cfg.Rules {
-		item := listItem{Mask: 0x1 | 0x8, Item: int32(i), Text: utf16(keyCaption(r.Source)), StateMask: 0xF000, State: 0x1000}
-		if r.Enabled {
-			item.State = 0x2000
-		}
-		send(list, lvmFirst+77, 0, uintptr(unsafe.Pointer(&item)))
-		// LVS_EX_CHECKBOXES initializes inserted rows to unchecked, so apply
-		// the saved checkbox state explicitly after insertion.
-		send(list, lvmFirst+43, uintptr(i), uintptr(unsafe.Pointer(&item)))
-		item = listItem{SubItem: 1, Text: utf16("→    " + keyCaption(r.Target))}
-		send(list, lvmFirst+116, uintptr(i), uintptr(unsafe.Pointer(&item)))
-		item = listItem{SubItem: 2, Text: utf16(a.ruleStateLabel(r))}
-		send(list, lvmFirst+116, uintptr(i), uintptr(unsafe.Pointer(&item)))
-	}
-	showWindow.Call(list, boolArg(len(a.cfg.Rules) != 0)*5)
-	enableWindow.Call(a.controls[idDelete], 0)
-	enableWindow.Call(a.controls[idEdit], 0)
-	a.updateDraft()
-	invalidateRect.Call(a.hwnd, 0, 0)
-}
-
-func (a *application) readChecks() {
-	changed := false
-	for i := range a.cfg.Rules {
-		state := send(a.controls[idList], lvmFirst+44, uintptr(i), 0xF000)
-		enabled := state>>12 == 2
-		if a.cfg.Rules[i].Enabled != enabled {
-			a.cfg.Rules[i].Enabled, changed = enabled, true
-		}
-	}
-	if changed {
-		a.changed("规则状态已更新。")
-	}
-}
-
-func (a *application) startCapture(id int) {
-	a.capturing = id
-	a.capturePending = false
-	if a.info != nil {
-		enableWindow.Call(a.info.hwnd, 0)
-	}
-	a.apply()
-	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idEdit, idCancelEdit, idLocateRule, idHelp, idSupport, idAbout, idRetrySave, idDiagnostics} {
-		enableWindow.Call(a.controls[other], boolArg(other == id))
-	}
-	setText(a.controls[id], "取消录入")
-	a.status = "现在按一下要录入的按键或鼠标按钮。Esc 取消，8 秒后自动结束。"
-	setTimer.Call(a.hwnd, 1, 8000, 0)
-	invalidateRect.Call(a.hwnd, 0, 0)
-}
-
-func (a *application) finishCapture(index int) {
-	if a.capturing == 0 {
-		return
-	}
-	killTimer.Call(a.hwnd, 1)
-	recordButton := a.capturing
-	combo := idSource
-	if recordButton == idRecordTarget {
-		combo = idTarget
-	}
-	// SetWindowText can synchronously request owner drawing. Clear the
-	// recording state first so that repaint already sees the normal label.
-	a.capturing = 0
-	a.capturePending = false
-	if a.info != nil {
-		enableWindow.Call(a.info.hwnd, 1)
-	}
-	setText(a.controls[recordButton], "录入按键")
-	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp, idSupport, idAbout, idCancelEdit, idLocateRule, idRetrySave, idDiagnostics} {
-		enableWindow.Call(a.controls[id], 1)
-	}
-	a.updateRuleActions()
-	if index > 0 && index <= len(keys) {
-		send(a.controls[combo], cbSetCurSel, uintptr(index-1), 0)
-		action := "添加映射"
-		if a.editing {
-			action = "保存修改"
-		}
-		a.status = "已录入：" + keys[index-1].Label + "。点击「" + action + "」保存。"
-	} else {
-		a.status = "已取消录入。"
-	}
-	a.apply()
-	a.updateDraft()
 }

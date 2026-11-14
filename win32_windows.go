@@ -99,6 +99,11 @@ var (
 	setWindowTheme         = uxtheme.NewProc("SetWindowTheme")
 	setWindowSubclass      = comctl32.NewProc("SetWindowSubclass")
 	defSubclassProc        = comctl32.NewProc("DefSubclassProc")
+	createPopupMenu        = user32.NewProc("CreatePopupMenu")
+	appendMenu             = user32.NewProc("AppendMenuW")
+	trackPopupMenu         = user32.NewProc("TrackPopupMenu")
+	destroyMenu            = user32.NewProc("DestroyMenu")
+	isChild                = user32.NewProc("IsChild")
 )
 
 const (

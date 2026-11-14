@@ -158,6 +158,15 @@ func (a *application) handleInput(id string, down bool) bool {
 	if a.captureHeld == id {
 		if !down {
 			a.captureHeld = ""
+			// A key already held before recording still needs its matching
+			// release in the engine, even though recording consumes this edge.
+			if _, held := a.engine.held[id]; held {
+				_, out := a.engine.process(id, false)
+				a.emit(out)
+			}
+			if a.capturing != 0 && a.capturePending {
+				postMessage.Call(a.hwnd, wmCaptured, uintptr(a.captureIndex), a.captureGeneration)
+			}
 		}
 		return true
 	}
@@ -168,7 +177,9 @@ func (a *application) handleInput(id string, down bool) bool {
 			var cursor point
 			var bounds rect
 			getCursorPos.Call(uintptr(unsafe.Pointer(&cursor)))
-			getWindowRect.Call(a.controls[a.capturing], uintptr(unsafe.Pointer(&bounds)))
+			if a.editor != nil {
+				getWindowRect.Call(a.editor.controls[eRecord], uintptr(unsafe.Pointer(&bounds)))
+			}
 			if cursor.X >= bounds.Left && cursor.X < bounds.Right && cursor.Y >= bounds.Top && cursor.Y < bounds.Bottom {
 				return false
 			}
@@ -176,14 +187,14 @@ func (a *application) handleInput(id string, down bool) bool {
 		if id == "escape" {
 			a.captureHeld = id
 			a.capturePending = true
-			postMessage.Call(a.hwnd, wmCaptured, 0, 0)
+			a.captureIndex = 0
 			return true
 		}
 		for i, k := range keys {
 			if k.ID == id {
 				a.captureHeld = id
 				a.capturePending = true
-				postMessage.Call(a.hwnd, wmCaptured, uintptr(i+1), 0)
+				a.captureIndex = i + 1
 				return true
 			}
 		}

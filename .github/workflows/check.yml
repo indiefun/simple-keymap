@@ -27,7 +27,11 @@ jobs:
         shell: pwsh
         env:
           SIMPLE_KEYMAP_TEST_CLIPBOARD: '1'
-        run: ./build.ps1 -TestOnly
+        run: |
+          ./build.ps1 -TestOnly
+          $env:SIMPLE_KEYMAP_TEST_DPI = '144'
+          go test -timeout 30s -run TestNativeRuleAndCaptureFlow -count=1 ./...
+          if ($LASTEXITCODE -ne 0) { throw 'High DPI interface checks failed.' }
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
