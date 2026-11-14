@@ -6,7 +6,8 @@
   };
   const repositoryURL = httpURL(settings.repositoryURL);
   const issuesURL = httpURL(settings.issuesURL) || (repositoryURL ? repositoryURL.replace(/\/$/, "") + "/issues" : "");
-  for (const [selector, url] of [["[data-repository]", repositoryURL], ["[data-issues]", issuesURL]]) {
+  const licenseURL = repositoryURL ? repositoryURL.replace(/\/$/, "") + "/blob/main/LICENSE" : "";
+  for (const [selector, url] of [["[data-repository]", repositoryURL], ["[data-issues]", issuesURL], ["[data-license]", licenseURL]]) {
     document.querySelectorAll(selector).forEach(link => {
       if (!url) { link.hidden = true; return; }
       link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.hidden = false;

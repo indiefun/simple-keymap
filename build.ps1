@@ -45,6 +45,9 @@ if (!$TestOnly) {
     }
     $taskReadme = (Get-Content -LiteralPath 'assets\release-readme.txt' -Raw -Encoding UTF8).Replace('{{VERSION}}', $Version)
     [System.IO.File]::WriteAllText((Join-Path $taskDestination 'README.txt'), $taskReadme, [System.Text.UTF8Encoding]::new($true))
+    foreach ($taskLegalFile in @('LICENSE', 'NOTICE', 'TRADEMARKS.md')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $taskLegalFile) -Destination (Join-Path $taskDestination $taskLegalFile) -Force
+    }
     $taskArchive = Join-Path $taskDestination ("SimpleKeymap-v$Version-windows-x64.zip")
     # Compress-Archive requests exclusive access and can race with Windows'
     # executable scanner. Read with sharing allowed and publish only a complete ZIP.
@@ -53,7 +56,7 @@ if (!$TestOnly) {
     try {
         $taskZip = [System.IO.Compression.ZipFile]::Open($taskArchiveStaging, [System.IO.Compression.ZipArchiveMode]::Create)
         try {
-            foreach ($taskFile in @($taskOutput, (Join-Path $taskDestination 'SimpleKeymap.Input.exe'), (Join-Path $taskDestination 'README.txt'))) {
+            foreach ($taskFile in @($taskOutput, (Join-Path $taskDestination 'SimpleKeymap.Input.exe'), (Join-Path $taskDestination 'README.txt'), (Join-Path $taskDestination 'LICENSE'), (Join-Path $taskDestination 'NOTICE'), (Join-Path $taskDestination 'TRADEMARKS.md'))) {
                 $taskEntry = $taskZip.CreateEntry([System.IO.Path]::GetFileName($taskFile), [System.IO.Compression.CompressionLevel]::Optimal)
                 $taskInput = [System.IO.File]::Open($taskFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
                 try {

@@ -30,6 +30,7 @@ const (
 	idDelete
 	idHelp
 	idSupport
+	idProject
 )
 
 type application struct {
@@ -164,7 +165,7 @@ func inputWorkerCommand(executable string) (*exec.Cmd, error) {
 	helper := filepath.Join(filepath.Dir(executable), "SimpleKeymap.Input.exe")
 	info, err := os.Stat(helper)
 	if err != nil || info.IsDir() {
-		return nil, fmt.Errorf("缺少输入服务文件：%s。请重新运行 build.ps1，并保留 dist 里的两个 exe 文件。", helper)
+		return nil, fmt.Errorf("缺少配套文件 SimpleKeymap.Input.exe。\n请重新下载完整压缩包，全部解压到同一文件夹后，再运行 SimpleKeymap.exe。\n\n未找到文件：%s", helper)
 	}
 	cmd := exec.Command(helper, "--input-worker")
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
@@ -286,6 +287,7 @@ func (a *application) createControls() error {
 		{"BUTTON", "删除所选", idDelete, 0xB, 740, 400, 108, 30},
 		{"BUTTON", "使用帮助", idHelp, 0xB, 776, 30, 72, 30},
 		{"BUTTON", "支持与反馈", idSupport, 0xB, 658, 30, 98, 30},
+		{"BUTTON", "GitHub 项目", idProject, 0xB, 522, 30, 116, 30},
 	}
 	for _, c := range types {
 		if _, err := a.control(c.class, c.text, c.id, c.style, c.x, c.y, c.w, c.h); err != nil {
@@ -466,19 +468,28 @@ func (a *application) command(id int) {
 	case idHelp:
 		messageBox.Call(a.hwnd, uintptr(unsafe.Pointer(utf16(
 			"轻映 "+appVersion+"\n\n"+
-				"1. 选择原按键和目标按键，点击「添加映射」。\n"+
-				"2. 也可以点击「录入按键」，再按一下键盘或鼠标按键。Esc 取消录入。\n"+
-				"3. 列表左侧勾选启用，取消勾选暂停；选中一行可删除。\n\n"+
+				"首次使用：已选好「鼠标侧键 1 → 鼠标中键」。\n"+
+				"点击「添加映射」，再切到其他应用试按即可。\n\n"+
+				"1. 在「按下这个键」中选择要替换的原按键。\n"+
+				"2. 在「变为这个键」中选择目标按键。\n"+
+				"3. 点击「添加映射」，切到其他应用使用。\n"+
+				"也可以点击「录入按键」后按一下；Esc 取消录入。\n"+
+				"列表左侧勾选启用，取消勾选暂停；选中一行可删除。\n\n"+
 				"按住原按键 = 持续按住目标按键，松开即释放。\n"+
+				"原按键原有的动作会被替换。\n"+
 				"Ctrl + Alt + F12：全局暂停 / 恢复。\n"+
 				"配置窗口内不执行映射，方便随时修改。\n"+
 				"最小化后继续生效；关闭窗口即停止映射并退出。\n\n"+
 				"只映射单个按键，不支持组合键、宏或滚轮滚动。\n"+
 				"目标程序以管理员运行时，轻映也需以管理员运行。\n"+
 				"部分游戏可能不接受模拟输入。\n\n"+
+				"免费开源 · GPL-3.0 · Copyright © 2026 Kevin Loo\n"+
+				"项目源码与许可："+repositoryURL+"\n\n"+
 				"配置自动保存至：\n"+a.path))), uintptr(unsafe.Pointer(utf16("轻映 · 使用说明"))), 0x40)
 	case idSupport:
 		a.openSupport()
+	case idProject:
+		a.openProject()
 	}
 }
 
@@ -516,7 +527,10 @@ func (a *application) draftHint() (string, bool) {
 			return "这个原按键已有映射，删除旧规则后可重新设置。", false
 		}
 	}
-	return "按下与抬起同步，长按也一样。", true
+	if !a.cfg.Enabled {
+		return "添加后，打开总开关并切到其他应用使用。", true
+	}
+	return "添加后，切换到其他应用即可使用。", true
 }
 
 func (a *application) updateDraft() {
@@ -598,7 +612,7 @@ func (a *application) startCapture(id int) {
 	a.capturing = id
 	a.capturePending = false
 	a.apply()
-	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idHelp, idSupport} {
+	for _, other := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idDelete, idHelp, idSupport, idProject} {
 		enableWindow.Call(a.controls[other], boolArg(other == id))
 	}
 	setText(a.controls[id], "取消录入")
@@ -622,7 +636,7 @@ func (a *application) finishCapture(index int) {
 	a.capturing = 0
 	a.capturePending = false
 	setText(a.controls[recordButton], "录入按键")
-	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp, idSupport} {
+	for _, id := range []int{idSource, idTarget, idRecordSource, idRecordTarget, idAdd, idToggle, idList, idHelp, idSupport, idProject} {
 		enableWindow.Call(a.controls[id], 1)
 	}
 	selected := int32(send(a.controls[idList], lvmFirst+12, ^uintptr(0), 0x2))

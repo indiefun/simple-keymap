@@ -25,6 +25,9 @@ const {handler} = require("./serve-site.cjs");
     await page.locator("#demo-press").waitFor();
     assert.match(await page.title(), /Windows.*键盘映射.*鼠标改键/);
     assert.equal(await page.locator("h1").count(), 1);
+    assert.equal(await page.locator("nav [data-repository]").isVisible(), true);
+    assert.equal(await page.locator("nav [data-repository]").getAttribute("href"), "https://github.com/indiefun/simple-keymap");
+    assert.equal(await page.locator(".hero-meta [data-license]").getAttribute("href"), "https://github.com/indiefun/simple-keymap/blob/main/LICENSE");
     assert.equal(await page.locator("[data-download]").getAttribute("href"), "https://github.com/indiefun/simple-keymap/releases/latest");
     assert.equal(await page.locator("[data-download-proxy]").getAttribute("href"), "https://gh-proxy.com/https://github.com/indiefun/simple-keymap/releases/latest/download/SimpleKeymap-windows-latest.zip");
     assert.equal(await page.locator("[data-download-proxy]").isVisible(), true);
@@ -66,6 +69,7 @@ const {handler} = require("./serve-site.cjs");
       for (const pathname of ["/", "/#support"]) {
         await page.goto(base+pathname);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${pathname} overflows at ${width}px`);
+        for (const link of await page.locator("nav a").all()) assert.equal(await link.isVisible(), true, `Navigation link hidden at ${width}px`);
         if (pathname === "/#support") await checkSupportPosition();
         if (width === 390) {
           if (pathname === "/") {
@@ -95,7 +99,8 @@ const {handler} = require("./serve-site.cjs");
     try {
       const staticPage = await withoutJS.newPage();
       await staticPage.goto(base);
-      assert.equal(await staticPage.locator('a[data-repository][href]').isVisible(), true);
+      assert.equal(await staticPage.locator('nav a[data-repository][href]').isVisible(), true);
+      assert.equal(await staticPage.locator('.hero-meta a[data-license][href]').isVisible(), true);
       assert.equal(await staticPage.locator('a[data-issues][href]').isVisible(), true);
       assert.equal(await staticPage.locator('[data-download-proxy]').isVisible(), true);
     } finally { await withoutJS.close(); }

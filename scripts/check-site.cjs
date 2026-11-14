@@ -14,6 +14,8 @@ if (config.qqGroup) assert.match(config.qqGroup, /^\d{5,12}$/, "Invalid QQ group
 const desktopSupport = fs.readFileSync(path.join(root, "../support_windows.go"), "utf8").match(/const supportURL = "([^"]+)"/);
 assert.ok(desktopSupport, "Desktop support URL missing");
 assert.equal(desktopSupport[1], new URL("#support", config.websiteURL).href, "Desktop and website domains must match");
+const desktopRepository = fs.readFileSync(path.join(root, "../support_windows.go"), "utf8").match(/const repositoryURL = "([^"]+)"/);
+assert.equal(desktopRepository?.[1], config.repositoryURL, "Desktop and website project URLs must match");
 assert.match(fs.readFileSync(path.join(root, "index.html"), "utf8"), /id="support"/, "Support anchor missing");
 for (const file of ["index.html", "404.html"]) {
   const html = fs.readFileSync(path.join(root, file), "utf8");
@@ -33,6 +35,7 @@ assert.ok(structuredText, "Software structured data missing");
 const schema = JSON.parse(structuredText);
 const app = schema["@graph"].find(entity => entity["@type"] === "SoftwareApplication");
 assert.equal(app.url, config.websiteURL, "Structured data must describe this website");
+assert.equal(app.license, `${config.repositoryURL}/blob/main/LICENSE`, "Structured license URL must match the project");
 const schemaHash = "sha256-" + crypto.createHash("sha256").update(structuredText).digest("base64");
 const headers = fs.readFileSync(path.join(root, "_headers"), "utf8");
 assert.ok(headers.includes(`'${schemaHash}'`), `Update the JSON-LD hash in _headers script-src to '${schemaHash}'`);

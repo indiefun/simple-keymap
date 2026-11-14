@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#176c58">
   <title>轻映 - Windows 键盘映射与鼠标改键工具 | Simple Keymap</title>
-  <meta name="description" content="轻映（Simple Keymap）是一款免费的 Windows 键盘和鼠标按键映射工具，支持把鼠标侧键映射为中键，按下、长按、抬起完整跟随。便携免安装，配置自动保存，提供国内加速下载。">
+  <meta name="description" content="轻映（Simple Keymap）是一款免费开源的 Windows 键盘和鼠标按键映射工具，支持把鼠标侧键映射为中键，按下、长按、抬起完整跟随。便携免安装，配置自动保存，提供国内加速下载。">
   <meta property="og:title" content="轻映 - Windows 键盘映射与鼠标改键工具">
-  <meta property="og:description" content="鼠标侧键变中键，按下与抬起完整跟随。免费的 Windows 按键映射工具，便携免安装，提供国内加速下载。">
+  <meta property="og:description" content="鼠标侧键变中键，按下与抬起完整跟随。免费开源的 Windows 按键映射工具，便携免安装，提供国内加速下载。">
   <meta property="og:site_name" content="轻映 Simple Keymap">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:type" content="website">
@@ -18,7 +18,7 @@
   <meta property="og:image:alt" content="轻映 Simple Keymap：Windows 键盘与鼠标映射工具，鼠标侧键映射为鼠标中键。">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="轻映 - Windows 键盘映射与鼠标改键工具">
-  <meta name="twitter:description" content="鼠标侧键变中键，按下与抬起完整跟随。免费、便携、免安装。">
+  <meta name="twitter:description" content="鼠标侧键变中键，按下与抬起完整跟随。免费开源、便携免安装。">
   <meta name="twitter:image" content="https://qingying.luming.host/assets/social-preview.png">
   <meta name="twitter:image:alt" content="轻映 Simple Keymap，鼠标侧键映射为鼠标中键。">
   <link rel="canonical" href="https://qingying.luming.host/">
@@ -45,11 +45,12 @@
         "name": "轻映",
         "alternateName": "Simple Keymap",
         "url": "https://qingying.luming.host/",
-        "description": "免费的 Windows 键盘与鼠标按键映射工具，支持鼠标侧键映射为中键，按下、长按、抬起完整跟随，便携免安装。",
+        "description": "免费开源的 Windows 键盘与鼠标按键映射工具，支持鼠标侧键映射为中键，按下、长按、抬起完整跟随，便携免安装。",
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "Windows 10, Windows 11 (64-bit)",
         "inLanguage": "zh-CN",
         "isAccessibleForFree": true,
+        "license": "https://github.com/indiefun/simple-keymap/blob/main/LICENSE",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
         "author": { "@type": "Person", "name": "Kevin Loo" },
         "image": "https://qingying.luming.host/assets/icon.png",
@@ -65,16 +66,16 @@
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="topbar wrap">
     <a class="brand" href="./" aria-label="轻映首页"><img src="assets/icon.svg" width="38" height="38" alt=""><span>轻映<small>Simple Keymap</small></span></a>
-    <nav aria-label="主导航"><a href="#how">如何使用</a><a href="#support">支持与反馈</a><a class="nav-download" href="#download">下载轻映 <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="主导航"><a href="#how">如何使用</a><a href="#support">支持与反馈</a><a data-repository href="https://github.com/indiefun/simple-keymap" target="_blank" rel="noopener noreferrer">GitHub 项目 <span aria-hidden="true">↗</span></a><a class="nav-download" href="#download">下载轻映 <span aria-hidden="true">↓</span></a></nav>
   </header>
   <main id="main">
     <section class="hero wrap">
       <div class="hero-copy">
         <p class="eyebrow"><span class="status-dot"></span> Windows 键盘与鼠标映射工具</p>
         <h1>让按键，<br><span>顺你的手。</span></h1>
-        <p class="lead">一个键，换一种用法。<br>鼠标侧键变中键，把操作交给习惯的按键。</p>
-        <div class="actions"><a class="button primary" href="#download">下载 Windows 版 <span aria-hidden="true">↓</span></a><a class="text-link" href="#demo">先试一下 <span aria-hidden="true">→</span></a></div>
-        <p class="hero-meta">免费使用 · Windows 10 / 11 · x64 · 解压即用</p>
+        <p class="lead">把键盘或鼠标的一个键，换成另一个键。<br>比如：鼠标侧键 → 中键（按下滚轮）。</p>
+        <div class="actions"><a class="button primary" href="#download">下载 Windows 版 <span aria-hidden="true">↓</span></a><a class="text-link" href="#demo">试试网页演示 <span aria-hidden="true">→</span></a></div>
+        <p class="hero-meta"><a data-license href="https://github.com/indiefun/simple-keymap/blob/main/LICENSE">免费开源 · GPL-3.0</a><span>Windows 10 / 11 · 64 位 · 解压即用</span></p>
       </div>
       <div class="demo-stage" id="demo">
         <div class="stage-orbit" aria-hidden="true"></div>
@@ -96,24 +97,26 @@
 
     <section class="benefits wrap" aria-label="轻映的特点">
       <article><span class="feature-mark" aria-hidden="true">01</span><h2>完整跟随</h2><p>按下就是按下，松开就是松开。<br>长按和连续点击都保留原本的手感。</p></article>
-      <article><span class="feature-mark" aria-hidden="true">02</span><h2>打开就会用</h2><p>选择两个按键，添加即可生效。<br>也可以直接按一下，完成录入。</p></article>
+      <article><span class="feature-mark" aria-hidden="true">02</span><h2>打开就会用</h2><p>选择两个按键，添加后切到其他应用使用。<br>也可以直接按一下，完成录入。</p></article>
       <article><span class="feature-mark" aria-hidden="true">03</span><h2>用完就关掉</h2><p>规则自动保存在本机。<br>最小化继续运行，关闭窗口即退出。</p></article>
     </section>
 
     <section class="section wrap how-section" id="how">
       <div class="section-heading"><p class="eyebrow">从第一条映射开始</p><h2>三步，换一个更顺手的键。</h2><p>例如，让鼠标侧键 1 完整替代滚轮中键。</p></div>
-      <ol class="steps"><li><span class="step-number">1</span><h3>选原按键</h3><p>选择「鼠标侧键 1」，或点击「录入按键」后按一下侧键。</p></li><li><span class="step-number">2</span><h3>选目标按键</h3><p>选择「鼠标中键」。键盘和鼠标按键之间，也可以互相映射。</p></li><li><span class="step-number">3</span><h3>添加，开始用</h3><p>点击「添加映射」，回到其他应用。你的按下和抬起会同步过去。</p></li></ol>
+      <p class="quick-start"><strong>第一次用？</strong>软件已选好「鼠标侧键 1 → 鼠标中键」，点击「添加映射」，再切到其他应用试按即可。</p>
+      <ol class="steps"><li><span class="step-number">1</span><h3>选原按键</h3><p>在「按下这个键」中选择要替换的键。也可以点击「录入按键」，再按一下。</p></li><li><span class="step-number">2</span><h3>选目标按键</h3><p>在「变为这个键」中选择新用途，比如「鼠标中键（按下滚轮）」。</p></li><li><span class="step-number">3</span><h3>添加，切到其他应用</h3><p>点击「添加映射」后切换窗口，或最小化轻映。按住原按键就是按住目标按键，松开即释放。</p></li></ol>
+      <p class="usage-note"><strong>请在其他应用中试按。</strong>轻映自己的配置窗口内暂不执行映射，方便修改；原按键在其他应用中的原有动作会被替换。</p>
       <div class="shortcut-note"><span><kbd>Ctrl</kbd> <span>+</span> <kbd>Alt</kbd> <span>+</span> <kbd>F12</kbd></span><p>随时暂停 / 恢复全部映射</p><span class="quiet">每条规则也能单独开关</span></div>
     </section>
 
     <section class="download-section" id="download">
       <div class="wrap download-inner">
-        <div><p class="eyebrow">轻装上阵</p><h2>下载，解压，开始使用。</h2><p>无需安装驱动，也不用注册账号。<br>保留同一文件夹里的两个程序，运行 <code>SimpleKeymap.exe</code>。</p></div>
+        <div class="download-copy"><p class="eyebrow">轻装上阵</p><h2>下载，解压，开始使用。</h2><p>免费开源，无需注册或安装驱动。</p><ol class="download-steps"><li>下载 ZIP 压缩包，<strong>全部解压</strong>到一个文件夹。</li><li>双击 <code>SimpleKeymap.exe</code> 打开轻映。</li><li>点击「添加映射」，切到其他应用试按。</li></ol><p class="package-note">请保留同目录的 <code>SimpleKeymap.Input.exe</code>，不用单独打开它。配置会自动保存；最小化继续运行，关闭窗口即退出。</p></div>
         <div class="download-panel">
           <span class="platform-mark" aria-hidden="true">⊞</span><h3>轻映 · Windows 便携版</h3><p>Windows 10 / 11 · 64 位</p>
           <div class="download-links">
             <a class="button primary" data-download-proxy href="https://gh-proxy.com/https://github.com/indiefun/simple-keymap/releases/latest/download/SimpleKeymap-windows-latest.zip">国内加速下载 <span aria-hidden="true">↓</span></a>
-            <a class="button secondary" data-download href="https://github.com/indiefun/simple-keymap/releases/latest">GitHub Release <span aria-hidden="true">↗</span></a>
+            <a class="button secondary" data-download href="https://github.com/indiefun/simple-keymap/releases/latest">GitHub 备用下载 <span aria-hidden="true">↗</span></a>
           </div>
           <a class="text-link" data-repository href="https://github.com/indiefun/simple-keymap">在 GitHub 查看源码 <span aria-hidden="true">↗</span></a>
           <small>加速下载由 gh-proxy.com 提供，不可用时请使用 GitHub。版本号和更新说明见发布页。</small>
@@ -121,7 +124,7 @@
       </div>
     </section>
 
-    <section class="section wrap faq-section" id="faq"><div class="section-heading"><p class="eyebrow">你可能想知道</p><h2>简单，也说清楚。</h2></div><div class="faq-list"><details><summary>支持哪些按键？</summary><p>支持鼠标左键、右键、中键、侧键 1 / 2，以及字母、数字、F1–F12、方向键、常用编辑键、小键盘、媒体键等。轻映专注单个按键的映射，不提供宏、组合键或滚轮滚动映射。</p></details><details><summary>可以在游戏里使用吗？</summary><p>取决于游戏是否接受 Windows 模拟输入。目标程序以管理员运行时，轻映也需要相同权限。部分游戏或受保护程序可能不接受模拟输入，轻映不承诺对所有游戏生效。</p></details><details><summary>为什么在配置窗口内试按没有效果？</summary><p>为了方便修改配置，轻映在自己的窗口内暂不执行映射。请切换到其他应用后再试；最小化后仍会继续运行，关闭窗口则会停止映射并退出。</p></details><details><summary>配置存在哪里？会收集输入记录吗？</summary><p>规则仅保存在本机的 <code>%APPDATA%/SimpleKeymap/config.json</code>。轻映不上传按键记录，不做账号或云端同步。网页也没有统计脚本。</p></details><details><summary>遇到输入发送超时怎么办？</summary><p>程序会暂停映射并显示原因。若 Windows 输入调用卡在内核里，请先保存工作并重启 Windows；反复结束任务或重新开启映射不能保证恢复输入链路。反馈时请附上系统版本、目标应用和复现步骤。</p></details></div></section>
+    <section class="section wrap faq-section" id="faq"><div class="section-heading"><p class="eyebrow">你可能想知道</p><h2>简单，也说清楚。</h2></div><div class="faq-list"><details><summary>免费吗？源码在哪里？</summary><p>轻映是免费开源项目，全部功能免费使用，捐助完全自愿。源码在 <a data-repository href="https://github.com/indiefun/simple-keymap">GitHub 项目仓库</a>，采用 <a data-license href="https://github.com/indiefun/simple-keymap/blob/main/LICENSE">GPL-3.0 许可证</a>。如果你要修改、分发软件，请阅读仓库中的许可和品牌说明。</p></details><details><summary>支持哪些按键？</summary><p>支持鼠标左键、右键、中键、侧键 1 / 2，以及字母、数字、F1–F12、方向键、常用编辑键、小键盘、媒体键等。轻映专注单个按键的映射，不提供宏、组合键或滚轮滚动映射。</p></details><details><summary>可以在游戏里使用吗？</summary><p>取决于游戏是否接受 Windows 模拟输入。目标程序以管理员运行时，轻映也需要相同权限。部分游戏或受保护程序可能不接受模拟输入，轻映不承诺对所有游戏生效。</p></details><details><summary>为什么在配置窗口内试按没有效果？</summary><p>为了方便修改配置，轻映在自己的窗口内暂不执行映射。请切换到其他应用后再试；最小化后仍会继续运行，关闭窗口则会停止映射并退出。</p></details><details><summary>配置存在哪里？会收集输入记录吗？</summary><p>规则仅保存在本机的 <code>%APPDATA%/SimpleKeymap/config.json</code>。轻映不上传按键记录，不做账号或云端同步。网页也没有统计脚本。</p></details><details><summary>遇到输入发送超时怎么办？</summary><p>程序会暂停映射并显示原因。若 Windows 输入调用卡在内核里，请先保存工作并重启 Windows；反复结束任务或重新开启映射不能保证恢复输入链路。反馈时请附上系统版本、目标应用和复现步骤。</p></details></div></section>
 
     <section class="section wrap support-section" id="support" aria-labelledby="support-title">
       <div class="section-heading"><p class="eyebrow">支持与反馈</p><h2 id="support-title">一句反馈，也是一份支持。</h2><p>遇到问题，来群里聊聊；觉得好用，也欢迎请作者喝杯咖啡。</p></div>
@@ -136,6 +139,6 @@
     </section>
     <span class="toast" id="toast" role="status" aria-live="polite"></span>
   </main>
-  <footer class="footer wrap"><span class="footer-brand"><img src="assets/icon.svg" width="24" height="24" alt="">轻映 · Simple Keymap</span><span>由 Kevin Loo 用心制作</span><a href="#support">支持与反馈 <span aria-hidden="true">↑</span></a></footer>
+  <footer class="footer wrap"><span class="footer-brand"><img src="assets/icon.svg" width="24" height="24" alt="">轻映 · Simple Keymap</span><span>© 2026 Kevin Loo · <a data-license href="https://github.com/indiefun/simple-keymap/blob/main/LICENSE">GPL-3.0</a></span><a data-repository href="https://github.com/indiefun/simple-keymap">免费开源 · GitHub <span aria-hidden="true">↗</span></a><a href="#support">支持与反馈 <span aria-hidden="true">↑</span></a></footer>
 </body>
 </html>

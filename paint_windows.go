@@ -111,7 +111,10 @@ func (a *application) stateCopy() (string, string, uintptr, uintptr) {
 		}
 	}
 	if count == 0 {
-		return "准备就绪", "添加并启用一条规则，即可开始使用。", accentColor, accentWash
+		if len(a.cfg.Rules) == 0 {
+			return "添加第一条映射", "选好两个按键，点击「添加映射」。", accentColor, accentWash
+		}
+		return "规则均已暂停", "勾选下方规则，即可恢复对应映射。", muted, rgb(237, 240, 238)
 	}
 	return "映射已开启", fmt.Sprintf("%d 条规则已启用 · 切换到其他应用生效", count), accentColor, accentWash
 }
@@ -119,7 +122,7 @@ func (a *application) stateCopy() (string, string, uintptr, uintptr) {
 func (a *application) paintContent(dc uintptr) {
 	drawIconEx.Call(dc, uintptr(a.px(30)), uintptr(a.px(24)), a.brandIcon, uintptr(a.px(44)), uintptr(a.px(44)), 0, 0, 3)
 	a.text(dc, "轻映", 86, 22, 180, 32, a.titleFont, ink, 0x20)
-	a.text(dc, "键盘与鼠标映射", 87, 56, 300, 22, a.smallFont, muted, 0x20)
+	a.text(dc, "免费开源 · 键盘与鼠标改键", 87, 56, 320, 22, a.smallFont, muted, 0x20)
 	title, detail, color, wash := a.stateCopy()
 	a.box(dc, 32, 88, 816, 60, 14, wash, wash)
 	a.box(dc, 50, 108, 7, 7, 7, color, color)
@@ -142,8 +145,8 @@ func (a *application) paintContent(dc uintptr) {
 	if len(a.cfg.Rules) == 0 {
 		a.box(dc, 416, 480, 48, 42, 12, softColor, softColor)
 		a.keyIcon(dc, 428, 489, false, muted)
-		a.text(dc, "第一条映射，从上方开始", 64, 536, 752, 28, a.font, ink, 0x1|0x20)
-		a.text(dc, "选好两个按键，点击「添加映射」即可使用。", 64, 570, 752, 24, a.smallFont, muted, 0x1|0x20)
+		a.text(dc, "选两个按键，添加你的第一条映射", 64, 536, 752, 28, a.font, ink, 0x1|0x20)
+		a.text(dc, "点击「添加映射」，再切换到其他应用试按。", 64, 570, 752, 24, a.smallFont, muted, 0x1|0x20)
 	} else {
 		a.text(dc, "启用 / 原按键", 58, 455, 320, 22, a.smallFont, muted, 0x20)
 		a.text(dc, "映射为", 432, 455, 280, 22, a.smallFont, muted, 0x20)
@@ -169,7 +172,7 @@ func (a *application) drawButton(d *drawItemStruct) {
 		return
 	}
 	id := int(d.ID)
-	text := map[int]string{idToggle: "暂停映射", idRecordSource: "录入按键", idRecordTarget: "录入按键", idAdd: "+ 添加映射", idDelete: "删除所选", idHelp: "使用帮助", idSupport: "支持与反馈 ↗"}[id]
+	text := map[int]string{idToggle: "暂停映射", idRecordSource: "录入按键", idRecordTarget: "录入按键", idAdd: "+ 添加映射", idDelete: "删除所选", idHelp: "使用帮助", idSupport: "支持与反馈 ↗", idProject: "GitHub 项目 ↗"}[id]
 	if id == a.capturing {
 		text = "取消录入"
 	}

@@ -2,6 +2,8 @@
 
 官网：`https://qingying.luming.host/`。纯 HTML / CSS / JavaScript，无框架、无服务端、无统计脚本。支持与捐助集成在首页下方，直接访问 `/#support` 即可定位。首页按键卡片只是交互演示，不发送真实系统按键。
 
+首屏、常见问题和页脚明确说明免费开源（GPL-3.0），主导航在桌面和手机均提供 GitHub 项目入口。源码、问题反馈和许可链接都由 `repositoryURL` 统一生成；无 JavaScript 时保留默认仓库链接。许可证和品牌说明分别见仓库根目录的 `LICENSE`、`TRADEMARKS.md`。
+
 ## 修改内容与支持信息
 
 页面在 `site/index.html`，样式在 `site/styles.css`，联系方式统一在 `site/config.js`：

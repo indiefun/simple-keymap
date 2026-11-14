@@ -1,16 +1,16 @@
 # 轻映 · 简单按键映射器
 
-Windows x64 桌面小工具，用 Go 和原生 Win32 编写。用一个键替代另一个键，无需安装驱动或系统服务。
+免费开源的 Windows x64 桌面小工具，用 Go 和原生 Win32 编写。用一个键替代另一个键，无需安装驱动或系统服务。
 
-官网：<https://qingying.luming.host/> · [下载最新版](https://github.com/indiefun/simple-keymap/releases/latest) · [问题反馈](https://github.com/indiefun/simple-keymap/issues)
+官网：<https://qingying.luming.host/> · [下载最新版](https://github.com/indiefun/simple-keymap/releases/latest) · [问题反馈](https://github.com/indiefun/simple-keymap/issues) · [GPL-3.0 许可](LICENSE)
 
 应用图标采用两枚叠放键帽与映射箭头，源文件和多尺寸 Windows 图标见 `assets`。图标已嵌入程序，重新编译会自动包含。
 
 ## 使用
 
-双击 **`dist/SimpleKeymap.exe`**。同目录的 `SimpleKeymap.Input.exe` 是隐藏的输入辅助进程，需要一起保留。所有打包文件统一在 `dist`。
+下载便携版 ZIP，**全部解压**到同一个文件夹，双击 **`SimpleKeymap.exe`**。同目录的 `SimpleKeymap.Input.exe` 是配套文件，请保留，不用单独打开。自行构建的打包文件统一在 `dist`。
 
-1. 默认已选好「鼠标侧键 1（后退）→ 鼠标中键（滚轮按下）」，点击「添加映射」即可。
+1. 默认已选好「鼠标侧键 1（后退）→ 鼠标中键（滚轮按下）」，点击「添加映射」，**切到其他应用试按**即可。
 2. 列表左侧勾选框控制单条规则，选中一行后可删除。
 3. 右上角控制全部映射；`Ctrl + Alt + F12` 全局暂停 / 恢复。
 4. 点击按键卡片可展开选择，也可点击旁边的「录入按键」后实际按一下。Esc 取消录入，8 秒后自动取消。
@@ -31,6 +31,16 @@ Windows x64 桌面小工具，用 Go 和原生 Win32 编写。用一个键替代
 配置窗口内暂不执行映射，方便操作；切到其他程序后生效。最小化后继续映射，关闭窗口停止监听并退出。正常退出会丢弃积压操作，仅释放已经模拟按住的键。
 
 配置自动保存到 `%APPDATA%/SimpleKeymap/config.json`。启动会恢复规则和总开关；配置读取失败时暂停，并保留原文件直到主动修改。
+
+## 开源许可与项目标识
+
+Copyright (C) 2026 Kevin Loo。本项目代码（包括桌面软件、网站及构建脚本）采用 **GNU GPL 第 3 版（GPL-3.0-only）**，全文见 [LICENSE](LICENSE)，版权声明见 [NOTICE](NOTICE)。全部功能免费使用，捐助自愿。
+
+允许使用、研究、修改以及商业使用。分发原版或修改版时，须保留版权和许可声明、标明修改，并按 GPL-3.0 的要求提供完整的对应源码及构建所需文件。仅在自己设备上使用、修改，不要求公开源码。GPL 允许合规的改名、派生和收费分发，不能用它禁止一切商业用途或修改版发布；它要求分发者遵守开源义务，也不能把原作者的版权声明删除后冒充完全由自己创作。
+
+项目名称和图标的品牌使用单独见 [TRADEMARKS.md](TRADEMARKS.md)。修改版应与官方版本明确区分，不能暗示由原作者发布或认可；品牌说明不限制 GPL 授予的代码权利。
+
+官方发布包会附带许可、版权和品牌说明，包内 `README.txt` 提供对应版本标签的源码及源码包地址。编译步骤见下方「编译」。
 
 ## 支持与捐助
 
