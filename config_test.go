@@ -9,7 +9,7 @@ import (
 
 func TestConfigRoundTripAndReplacement(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings", "config.json")
-	want := config{Enabled: true, Rules: []rule{{"mouse_x1", "mouse_middle", true}}}
+	want := config{Enabled: true, Rules: []rule{{"mouse_x1", "mouse_middle", true}}, CheckUpdatesOnStartup: true}
 	for _, enabled := range []bool{true, false} {
 		want.Enabled = enabled
 		if err := saveConfig(path, want); err != nil {
@@ -55,7 +55,7 @@ func TestRulesRejectUnknownSameAndDuplicateKeys(t *testing.T) {
 
 func TestMissingConfigDefaultsToNoRules(t *testing.T) {
 	c, err := loadConfig(filepath.Join(t.TempDir(), "config.json"))
-	if err != nil || !c.Enabled || len(c.Rules) != 0 {
+	if err != nil || !c.Enabled || len(c.Rules) != 0 || c.CheckUpdatesOnStartup {
 		t.Fatalf("unexpected defaults: %#v, %v", c, err)
 	}
 }

@@ -18,7 +18,7 @@ func (a *application) createControls() error {
 		id   int
 	}{
 		{"＋ 添加映射", idNew}, {"映射总开关", idToggle}, {"查看原因", idFaultDetails},
-		{"关于与许可", idAbout}, {"支持与反馈", idSupport}, {"使用帮助", idHelp},
+		{"关于与许可", idAbout}, {"支持与反馈 ↗", idSupport}, {"检查更新", idUpdates},
 		{"添加第一条映射", idAdd}, {"用「鼠标侧键 → 中键」示例开始", idPreset},
 		{"撤销删除", idUndo}, {"重试保存", idRetrySave}, {"最小化，去试试", idTryNow}, {"知道了", idDismissSuccess},
 	} {
@@ -26,7 +26,7 @@ func (a *application) createControls() error {
 			return err
 		}
 	}
-	list, err := a.control("SysListView32", "已有映射；方向键选择，F2 修改，Shift+F10 更多操作", idList, 0x1|0x4|0x8|0x40|0x4000|wsClipChildren, 32, 214, 836, 300)
+	list, err := a.control("SysListView32", "已有映射；方向键选择，F2 修改，Delete 删除", idList, 0x1|0x4|0x8|0x40|0x4000|wsClipChildren, 32, 214, 836, 300)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (a *application) createControls() error {
 	send(list, lvmFirst+54, 0, 0x20|0x10000)
 	send(list, lvmFirst+1, 0, surfaceColor)
 	send(list, lvmFirst+38, 0, surfaceColor)
-	for index, text := range []string{"按下这个键", "代替这个键", "启用", "修改", "更多"} {
+	for index, text := range []string{"启用", "按下这个键", "代替这个键", "修改", "删除"} {
 		column := listColumn{Mask: 0x1 | 0x2 | 0x4, Text: utf16(text), Width: int32(a.px(100))}
 		send(list, lvmFirst+97, uintptr(index), uintptr(unsafe.Pointer(&column)))
 	}
@@ -77,9 +77,9 @@ func (a *application) layoutMain() {
 	}
 	place(idAbout, w-366, 30, 116, 32, true)
 	place(idSupport, w-242, 30, 118, 32, true)
-	place(idHelp, w-116, 30, 84, 32, true)
-	place(idToggle, w-168, 108, 120, 36, has || a.inputFailureMessage != "")
-	place(idFaultDetails, w-270, 108, 92, 36, a.inputFailureMessage != "")
+	place(idUpdates, w-116, 30, 84, 32, true)
+	place(idToggle, w-112, 108, 64, 36, has || a.inputFailureMessage != "")
+	place(idFaultDetails, 270, 108, 92, 36, a.inputFailureMessage != "")
 	enableWindow.Call(a.controls[idToggle], boolArg(a.inputFailureMessage == ""))
 	place(idNew, w-180, a.listTop()-52, 148, 38, has)
 	place(idAdd, (w-200)/2, 340, 200, 44, !has)
@@ -101,7 +101,7 @@ func (a *application) layoutMain() {
 func (a *application) listWidths() [5]int {
 	w, _ := a.clientSize(a.controls[idList])
 	usable := w - 20
-	return [5]int{(usable - 218) / 2, (usable - 218) / 2, 92, 72, 54}
+	return [5]int{72, (usable - 216) / 2, (usable - 216) / 2, 72, 72}
 }
 
 func (a *application) layoutRowActions() {
@@ -110,18 +110,18 @@ func (a *application) layoutRowActions() {
 	}
 	w, h := a.clientSize(a.controls[idList])
 	widths := a.listWidths()
-	x := widths[0] + widths[1]
+	x := widths[0] + widths[1] + widths[2]
 	for index, buttons := range a.rowActions {
 		var r rect
 		send(a.controls[idList], lvmFirst+14, uintptr(index), uintptr(unsafe.Pointer(&r)))
 		top, bottom := int(r.Top)*96/a.dpi, int(r.Bottom)*96/a.dpi
 		shown := len(a.cfg.Rules) > 0 && bottom > 0 && top >= 0 && bottom <= h && w > 0
-		for column, button := range buttons {
-			offset := 0
-			for k := 0; k < column; k++ {
-				offset += widths[k+2]
+		for action, button := range buttons {
+			left, width := 12, 48
+			if action > 0 {
+				left, width = x+(action-1)*widths[3], widths[action+2]-6
 			}
-			a.moveControl(button, x+offset, top+22, widths[column+2]-6, 36)
+			a.moveControl(button, left, top+22, width, 36)
 			visibleControl(button, shown)
 		}
 	}
@@ -139,14 +139,14 @@ func (a *application) refreshList() {
 	list := a.controls[idList]
 	send(list, lvmFirst+9, 0, 0)
 	for index, r := range a.cfg.Rules {
-		item := listItem{Mask: 1, Item: int32(index), Text: utf16(keyLabel(r.Source))}
+		item := listItem{Mask: 1, Item: int32(index), Text: utf16(ruleEnabledText(r))}
 		send(list, lvmFirst+77, 0, uintptr(unsafe.Pointer(&item)))
-		for column, text := range []string{keyLabel(r.Target), ruleEnabledText(r), "修改", "更多操作"} {
+		for column, text := range []string{keyLabel(r.Source), keyLabel(r.Target), "修改", "删除"} {
 			item = listItem{SubItem: int32(column + 1), Text: utf16(text)}
 			send(list, lvmFirst+116, uintptr(index), uintptr(unsafe.Pointer(&item)))
 		}
 		var buttons [3]uintptr
-		for action, text := range []string{ruleEnabledText(r), "修改", "⋯"} {
+		for action, text := range []string{ruleEnabledText(r), "修改", "删除"} {
 			id := rowActionBase + index*3 + action
 			accessible := text
 			if action == 0 {
@@ -154,7 +154,7 @@ func (a *application) refreshList() {
 			} else if action == 1 {
 				accessible = "修改 " + keyCaption(r.Source) + " 到 " + keyCaption(r.Target)
 			} else {
-				accessible = "更多操作：" + keyCaption(r.Source)
+				accessible = "删除 " + keyCaption(r.Source) + " 到 " + keyCaption(r.Target)
 			}
 			// The list owns and clips its buttons. Sibling overlays are painted
 			// over when the native list redraws selection or keyboard focus.
@@ -256,7 +256,7 @@ func (a *application) command(id int) {
 		case 1:
 			a.openEditor(index, false)
 		case 2:
-			a.ruleMenu(index)
+			a.deleteSelected()
 		}
 		return
 	}
@@ -286,7 +286,10 @@ func (a *application) command(id int) {
 	case idHelp:
 		a.openInformation("help")
 	case idSupport:
-		a.openInformation("support")
+		a.openSupport()
+	case idUpdates:
+		a.openInformation("updates")
+		a.startUpdateCheck()
 	case idAbout:
 		a.openInformation("about")
 	case idRetrySave:
@@ -359,6 +362,9 @@ func (a *application) changed(message string) {
 }
 
 func (a *application) dispose() {
+	if a.updates != nil && a.updates.cancel != nil {
+		a.updates.cancel()
+	}
 	a.closeEditor(true)
 	a.closeInformation()
 	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.keyFont, a.background, a.whiteBrush, a.accentBrush} {
@@ -467,6 +473,9 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			return 0
 		case wmSendOutput:
 			a.flushOutput()
+			return 0
+		case wmUpdateResult:
+			a.receiveUpdateResult()
 			return 0
 		case wmClose:
 			if a.editor != nil && !a.requestCloseEditor() {

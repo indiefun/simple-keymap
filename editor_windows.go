@@ -549,7 +549,8 @@ func (a *application) saveEditor() {
 	if r.Source == "" || r.Target == "" || r.Source == r.Target || a.editorConflict() >= 0 || ed.index >= 0 && r == ed.original {
 		return
 	}
-	next := config{Enabled: a.cfg.Enabled, Rules: append([]rule{}, a.cfg.Rules...)}
+	next := a.cfg
+	next.Rules = append([]rule{}, a.cfg.Rules...)
 	index := ed.index
 	message := "已修改："
 	if index < 0 {

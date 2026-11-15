@@ -37,6 +37,7 @@ const (
 	idUndo
 	idTryNow
 	idDismissSuccess
+	idUpdates
 )
 
 type application struct {
@@ -76,6 +77,7 @@ type application struct {
 	successMessage                          string
 	successActive                           bool
 	rowActions                              map[int][3]uintptr
+	updates                                 *updateState
 }
 
 var app *application
@@ -173,6 +175,9 @@ func main() {
 	}
 	showWindow.Call(app.hwnd, 5)
 	updateWindow.Call(app.hwnd)
+	if app.cfg.CheckUpdatesOnStartup {
+		app.startUpdateCheck()
+	}
 	if loadErr != nil {
 		showError(app.hwnd, "无法载入配置，已暂停映射。\n"+loadErr.Error()+"\n\n配置位置："+path)
 	}
@@ -207,6 +212,9 @@ func (a *application) beginShutdown() {
 		return
 	}
 	a.closing = true
+	if a.updates != nil && a.updates.cancel != nil {
+		a.updates.cancel()
+	}
 	a.closeEditor(true)
 	killTimer.Call(a.hwnd, 1)
 	a.stopHooks()

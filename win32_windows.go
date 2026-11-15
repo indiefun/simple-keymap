@@ -43,6 +43,7 @@ var (
 	getWindowText          = user32.NewProc("GetWindowTextW")
 	getWindowTextLength    = user32.NewProc("GetWindowTextLengthW")
 	setWindowLong          = user32.NewProc("SetWindowLongPtrW")
+	setWindowPos           = user32.NewProc("SetWindowPos")
 	openClipboard          = user32.NewProc("OpenClipboard")
 	closeClipboard         = user32.NewProc("CloseClipboard")
 	emptyClipboard         = user32.NewProc("EmptyClipboard")
@@ -93,6 +94,7 @@ var (
 	createCompatibleDC     = gdi32.NewProc("CreateCompatibleDC")
 	createCompatibleBitmap = gdi32.NewProc("CreateCompatibleBitmap")
 	bitBlt                 = gdi32.NewProc("BitBlt")
+	setDIBitsToDevice      = gdi32.NewProc("SetDIBitsToDevice")
 	deleteDC               = gdi32.NewProc("DeleteDC")
 	initCommonControls     = comctl32.NewProc("InitCommonControlsEx")
 	imageListCreate        = comctl32.NewProc("ImageList_Create")
@@ -122,6 +124,7 @@ const (
 	wmCaptured     = 0x8001
 	wmInputError   = 0x8002
 	wmSendOutput   = 0x8003
+	wmUpdateResult = 0x8004
 	wsChild        = 0x40000000
 	wsVisible      = 0x10000000
 	wsTabstop      = 0x00010000

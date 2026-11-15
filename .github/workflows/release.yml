@@ -59,7 +59,7 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $PWD $source))
           try {
-            foreach ($file in @('LICENSE', 'NOTICE', 'TRADEMARKS.md', 'README.md', 'build.ps1', 'go.mod', 'main_windows.go', 'main_ui_windows.go', 'editor_windows.go', 'information_windows.go', 'scripts/verify-package.ps1')) {
+            foreach ($file in @('LICENSE', 'NOTICE', 'TRADEMARKS.md', 'README.md', 'build.ps1', 'go.mod', 'main_windows.go', 'main_ui_windows.go', 'editor_windows.go', 'information_windows.go', 'switch_windows.go', 'updates_windows.go', 'scripts/verify-package.ps1')) {
               if (!$zip.GetEntry("SimpleKeymap-v$version/$file")) { throw "Source package missing $file" }
             }
           } finally { $zip.Dispose() }

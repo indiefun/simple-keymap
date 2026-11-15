@@ -19,7 +19,7 @@
 
 微信收款码原样来自 `../d4-helper/assets/donate.jpg`。未配置的 GitHub / QQ 入口会自动隐藏。
 
-桌面程序在顶部「支持与反馈」提供本地诊断信息复制，再由「官网反馈」打开 `https://qingying.luming.host/#support`。新建在独立窗口完成「按哪个键 → 代替哪个键 → 确认效果」，主界面管理已有规则，官网教程与包内说明须保持一致。更新群号、收款码、页面内容后，只需推送 `main`。若更换域名，同时更新 `support_windows.go`、本站配置、首页 canonical / Open Graph 和 `wrangler.jsonc`。
+桌面程序顶部「支持与反馈」直接打开 `https://qingying.luming.host/#support`，诊断信息在「关于与许可 → 诊断信息」中复制。「检查更新」通过官网 `/#download` 提供下载入口。新建在独立窗口完成「按哪个键 → 代替哪个键 → 确认效果」，主界面管理已有规则，官网教程与包内说明须保持一致。更新群号、收款码、页面内容后，只需推送 `main`。若更换域名，同时更新 `support_windows.go`、`updates_windows.go`、本站配置、首页 canonical / Open Graph 和 `wrangler.jsonc`。
 
 ## 一次性连接 Cloudflare Workers Builds
 

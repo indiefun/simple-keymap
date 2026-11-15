@@ -16,6 +16,8 @@ assert.ok(desktopSupport, "Desktop support URL missing");
 assert.equal(desktopSupport[1], new URL("#support", config.websiteURL).href, "Desktop and website domains must match");
 const desktopRepository = fs.readFileSync(path.join(root, "../support_windows.go"), "utf8").match(/const repositoryURL = "([^"]+)"/);
 assert.equal(desktopRepository?.[1], config.repositoryURL, "Desktop and website project URLs must match");
+const desktopDownload = fs.readFileSync(path.join(root, "../updates_windows.go"), "utf8").match(/const downloadURL = "([^"]+)"/);
+assert.equal(desktopDownload?.[1], new URL("#download", config.websiteURL).href, "Desktop update downloads must match the website");
 assert.match(fs.readFileSync(path.join(root, "index.html"), "utf8"), /id="support"/, "Support anchor missing");
 for (const file of ["index.html", "404.html"]) {
   const html = fs.readFileSync(path.join(root, file), "utf8");

@@ -96,11 +96,12 @@ func (a *application) paintContent(dc uintptr) {
 		a.box(dc, 32, 100, w-64, 52, 12, surfaceColor, lineColor)
 		a.text(dc, "映射总开关", 48, 114, 104, 26, a.font, ink, 0x20)
 		detail, color := a.stateCopy()
-		detailWidth := w - 350
+		detailWidth := w - 488
 		if a.inputFailureMessage != "" {
-			detailWidth -= 102
+			detailWidth = 100
 		}
 		a.text(dc, detail, 164, 116, detailWidth, 22, a.smallFont, color, 0x20|0x8000)
+		a.text(dc, "Ctrl + Alt + F12", w-292, 116, 168, 22, a.smallFont, muted, 0x2|0x20)
 	}
 	if len(a.cfg.Rules) == 0 {
 		a.box(dc, w/2-28, 212, 56, 48, 14, accentWash, accentWash)
@@ -137,8 +138,6 @@ func (a *application) paintContent(dc uintptr) {
 		fg = warningColor
 	}
 	a.text(dc, footer, 32, h-42, 260, 24, a.smallFont, fg, 0x20)
-	a.text(dc, "Ctrl + Alt + F12 · 暂停 / 恢复", w-470, h-42, 250, 24, a.smallFont, muted, 0x20)
-	a.text(dc, "最小化继续 · 关闭退出", w-224, h-42, 192, 24, a.smallFont, muted, 0x2|0x20)
 }
 
 func (a *application) drawButton(d *drawItemStruct) {
@@ -177,15 +176,7 @@ func (a *application) drawButton(d *drawItemStruct) {
 	w, h := int(d.Rect.Right)*96/a.dpi, int(d.Rect.Bottom)*96/a.dpi
 	if id == idToggle {
 		on := a.cfg.Enabled && a.inputFailureMessage == ""
-		a.drawSwitch(d.DC, 8, (h-22)/2, 40, 22, on)
-		label := "已暂停"
-		if on {
-			label = "已开启"
-		}
-		if a.inputFailureMessage != "" {
-			label = "故障暂停"
-		}
-		a.text(d.DC, label, 58, 0, w-58, h, a.smallFont, fg, 0x4|0x20)
+		a.drawSwitch(d.DC, (w-40)/2, (h-22)/2, 40, 22, on, surfaceColor)
 		if d.State&0x10 != 0 {
 			a.line(d.DC, 8, h-2, w-2, h-2, accentColor, 1)
 		}
@@ -194,8 +185,7 @@ func (a *application) drawButton(d *drawItemStruct) {
 	if id >= rowActionBase && (id-rowActionBase)%3 == 0 {
 		index := (id - rowActionBase) / 3
 		if index < len(a.cfg.Rules) {
-			a.drawSwitch(d.DC, 2, (h-18)/2, 30, 18, a.cfg.Rules[index].Enabled)
-			a.text(d.DC, ruleEnabledText(a.cfg.Rules[index]), 38, 0, w-38, h, a.smallFont, fg, 0x4|0x20)
+			a.drawSwitch(d.DC, (w-40)/2, (h-22)/2, 40, 22, a.cfg.Rules[index].Enabled, a.rowBackground(index))
 			if d.State&0x10 != 0 {
 				a.line(d.DC, 2, h-2, w-2, h-2, accentColor, 1)
 			}
@@ -208,19 +198,10 @@ func (a *application) drawButton(d *drawItemStruct) {
 		if (id-rowActionBase)%3 == 1 {
 			label = "修改"
 		} else {
-			label = "⋯"
+			label = "删除"
 		}
 	}
 	a.textRect(d.DC, label, &d.Rect, a.smallFont, fg, 0x1|0x4|0x20)
-}
-
-func (a *application) drawSwitch(dc uintptr, x, y, w, h int, on bool) {
-	track, knob := rgb(174, 187, 178), x+3
-	if on {
-		track, knob = accentColor, x+w-h+3
-	}
-	a.box(dc, x, y, w, h, h, track, track)
-	a.box(dc, knob, y+3, h-6, h-6, h-6, surfaceColor, surfaceColor)
 }
 
 func (a *application) rowBackground(index int) uintptr {
@@ -255,10 +236,11 @@ func (a *application) drawList(d *listCustomDraw) uintptr {
 	if !row.Enabled {
 		fg = muted
 	}
-	a.text(d.Draw.DC, keyCaption(row.Source), 20, top+17, widths[0]-50, 26, a.font, fg, 0x20|0x8000)
-	a.text(d.Draw.DC, keyDetail(row.Source), 20, top+47, widths[0]-50, 20, a.smallFont, muted, 0x20|0x8000)
-	a.text(d.Draw.DC, "→", widths[0]-24, top+24, 24, 26, a.font, muted, 0x20)
-	a.text(d.Draw.DC, keyCaption(row.Target), widths[0]+10, top+17, widths[1]-20, 26, a.font, fg, 0x20|0x8000)
-	a.text(d.Draw.DC, keyDetail(row.Target), widths[0]+10, top+47, widths[1]-20, 20, a.smallFont, muted, 0x20|0x8000)
+	sourceX, targetX := widths[0]+8, widths[0]+widths[1]+10
+	a.text(d.Draw.DC, keyCaption(row.Source), sourceX, top+17, widths[1]-42, 26, a.font, fg, 0x20|0x8000)
+	a.text(d.Draw.DC, keyDetail(row.Source), sourceX, top+47, widths[1]-42, 20, a.smallFont, muted, 0x20|0x8000)
+	a.text(d.Draw.DC, "→", targetX-34, top+24, 24, 26, a.font, muted, 0x20)
+	a.text(d.Draw.DC, keyCaption(row.Target), targetX, top+17, widths[2]-20, 26, a.font, fg, 0x20|0x8000)
+	a.text(d.Draw.DC, keyDetail(row.Target), targetX, top+47, widths[2]-20, 20, a.smallFont, muted, 0x20|0x8000)
 	return 0x4
 }

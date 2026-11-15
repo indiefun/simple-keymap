@@ -8,8 +8,9 @@ import (
 )
 
 type config struct {
-	Enabled bool   `json:"enabled"`
-	Rules   []rule `json:"rules"`
+	Enabled               bool   `json:"enabled"`
+	Rules                 []rule `json:"rules"`
+	CheckUpdatesOnStartup bool   `json:"checkUpdatesOnStartup,omitempty"`
 }
 
 func validateRules(rules []rule) error {

@@ -165,9 +165,12 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	testTransactionalSave(t, a)
 	testNativeLayout(t, a)
 	// Deletion and undo preserve the actual paused rule and persist the result.
-	a.selectRule(0)
+	a.selectRule(1)
 	removed := a.cfg.Rules[0]
-	a.command(idDelete)
+	send(a.rowActions[0][2], 0x00f5, 0, 0)
+	if len(a.cfg.Rules) != 1 || a.cfg.Rules[0] == removed {
+		t.Fatal("inline delete failed to remove the selected mapping")
+	}
 	a.command(idUndo)
 	if a.cfg.Rules[0] != removed {
 		t.Fatal("undo changed rule state")
@@ -180,6 +183,7 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	a.layoutMain()
 	captureInterface(t, a.hwnd, "v2-main.png")
 	testInformationFlow(t, a)
+	testNativeUpdates(t, a)
 	// UI changes cannot re-enable a failed input service, and output handoff
 	// remains deferred until the hook returns, just as before the redesign.
 	received := make(chan []output, 1)
@@ -267,7 +271,7 @@ func testNativeLayout(t *testing.T, a *application) {
 	}
 	w, h := a.clientSize(a.hwnd)
 	mapPoints := user32.NewProc("MapWindowPoints")
-	for _, hwnd := range []uintptr{a.controls[idAbout], a.controls[idSupport], a.controls[idHelp], a.controls[idNew], a.controls[idToggle], a.controls[idList], a.rowActions[19][0], a.rowActions[19][1], a.rowActions[19][2]} {
+	for _, hwnd := range []uintptr{a.controls[idAbout], a.controls[idSupport], a.controls[idUpdates], a.controls[idNew], a.controls[idToggle], a.controls[idList], a.rowActions[19][0], a.rowActions[19][1], a.rowActions[19][2]} {
 		var r rect
 		getWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
 		mapPoints.Call(0, a.hwnd, uintptr(unsafe.Pointer(&r)), 2)
@@ -322,7 +326,7 @@ func testNativeRowRepaint(t *testing.T, a *application) {
 		item := listItem{StateMask: 3}
 		send(list, lvmFirst+43, ^uintptr(0), uintptr(unsafe.Pointer(&item)))
 		if selected {
-			position := uintptr(a.px(24)) | uintptr(a.px(40))<<16
+			position := uintptr(a.px(96)) | uintptr(a.px(40))<<16
 			// The native list tracks selection in a nested message loop until
 			// release; queue that release before sending the button-down.
 			postMessage.Call(list, 0x0202, 0, position)
@@ -556,13 +560,106 @@ func testInformationFlow(t *testing.T, a *application) {
 	if windowText(a.info.controls[infoBody]) != normalizeNoticeText(trademarksText) {
 		t.Fatal("brand notice missing")
 	}
-	a.command(idHelp)
+	send(a.info.controls[infoHelp], 0x00f5, 0, 0)
 	if a.info.page != "help" {
 		t.Fatal("help missing")
 	}
-	a.command(idSupport)
+	a.command(idAbout)
+	send(a.info.controls[infoDiagnostics], 0x00f5, 0, 0)
 	testDiagnosticClipboard(t, a)
 	a.closeInformation()
+}
+
+func testNativeUpdates(t *testing.T, a *application) {
+	t.Helper()
+	previousVersion := appVersion
+	appVersion = "1.2.0"
+	defer func() { appVersion = previousVersion }()
+	previous := a.cfg
+	a.openInformation("updates")
+	setFocus.Call(a.info.controls[infoBody])
+	for _, id := range []int{infoAutoUpdate, infoCheckUpdate, infoDownloadUpdate, infoClose} {
+		focus, _, _ := getFocus.Call()
+		msg := winMessage{Hwnd: focus, Message: 0x0100, WParam: 9}
+		isDialogMessage.Call(a.info.hwnd, uintptr(unsafe.Pointer(&msg)))
+		focus, _, _ = getFocus.Call()
+		if focus != a.info.controls[id] {
+			t.Fatalf("updates Tab order differs from visual order: wanted %d, got %x (%s)", id, focus, windowText(focus))
+		}
+	}
+	if a.cfg.CheckUpdatesOnStartup || send(a.info.controls[infoAutoUpdate], 0x00f0, 0, 0) != 0 {
+		t.Fatal("automatic network checks must be opt in")
+	}
+	send(a.info.controls[infoAutoUpdate], 0x00f5, 0, 0)
+	saved, err := loadConfig(a.path)
+	if err != nil || !saved.CheckUpdatesOnStartup || !reflect.DeepEqual(saved.Rules, previous.Rules) || saved.Enabled != previous.Enabled {
+		t.Fatal("update preference changed mappings or was not saved")
+	}
+	// Editing a rule must preserve the new preference, even though the editor
+	// constructs and saves a candidate configuration of its own.
+	a.closeInformation()
+	a.openEditor(0, false)
+	a.editor.draft.Target = "F11"
+	a.saveEditor()
+	if !a.cfg.CheckUpdatesOnStartup {
+		t.Fatal("rule save discarded update preference")
+	}
+	a.openInformation("updates")
+	state := a.updateSettings()
+	state.checking = true
+	state.results = make(chan updateResult, 1)
+	a.refreshUpdates()
+	if enabled, _, _ := user32.NewProc("IsWindowEnabled").Call(a.info.controls[infoCheckUpdate]); enabled != 0 {
+		t.Fatal("update checks can overlap")
+	}
+	state.results <- updateResult{version: "99.0.0"}
+	send(a.hwnd, wmUpdateResult, 0, 0)
+	if state.checking || !strings.Contains(windowText(a.info.controls[infoBody]), "99.0.0") {
+		t.Fatal("check result was not displayed")
+	}
+	if windowText(a.controls[idUpdates]) != "发现新版本" {
+		t.Fatal("available update has no navigation indicator")
+	}
+	captureInterface(t, a.info.hwnd, "updates-available.png")
+	state.results <- updateResult{version: appVersion}
+	send(a.hwnd, wmUpdateResult, 0, 0)
+	if !strings.Contains(windowText(a.info.controls[infoBody]), "当前已是最新") || windowText(a.controls[idUpdates]) != "检查更新" {
+		t.Fatal("up-to-date result kept the update indicator")
+	}
+	state.results <- updateResult{err: os.ErrDeadlineExceeded}
+	send(a.hwnd, wmUpdateResult, 0, 0)
+	if !strings.Contains(windowText(a.info.controls[infoBody]), "检查失败") {
+		t.Fatal("failed check claimed success")
+	}
+	// A failed preference save must revert the checkbox and retain the value.
+	path := a.path
+	a.path = filepath.Join(t.TempDir(), "occupied", "config.json")
+	if err := os.WriteFile(filepath.Dir(a.path), []byte("occupied"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	send(a.info.controls[infoAutoUpdate], 0x00f5, 0, 0)
+	if !a.cfg.CheckUpdatesOnStartup || state.settingErr == "" || send(a.info.controls[infoAutoUpdate], 0x00f0, 0, 0) != 1 {
+		t.Fatal("failed preference save was not rolled back")
+	}
+	a.path = path
+	send(a.info.controls[infoAutoUpdate], 0x00f5, 0, 0)
+	if a.cfg.CheckUpdatesOnStartup || state.settingErr != "" {
+		t.Fatal("preference retry did not save")
+	}
+	a.closeInformation()
+	state.results <- updateResult{version: "99.0.0"}
+	send(a.hwnd, wmUpdateResult, 0, 0)
+	if a.info != nil {
+		t.Fatal("background result reopened a closed window")
+	}
+	a.cfg = previous
+	if err := saveConfig(a.path, a.cfg); err != nil {
+		t.Fatal(err)
+	}
+	a.apply()
+	a.refreshList()
+	a.updates = nil
+	a.refreshUpdates()
 }
 
 func TestVersionedSourceLinks(t *testing.T) {
