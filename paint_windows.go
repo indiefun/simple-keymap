@@ -92,9 +92,16 @@ func (a *application) paintContent(dc uintptr) {
 	a.text(dc, "轻映", 84, 22, 200, 30, a.titleFont, ink, 0x20)
 	a.text(dc, "免费开源 · 键盘与鼠标改键", 85, 55, 350, 22, a.smallFont, muted, 0x20)
 	a.line(dc, 32, 86, w-32, 86, lineColor, 1)
-	title, detail, color, _ := a.stateCopy()
-	a.text(dc, title, 32, 104, w-220, 30, a.headingFont, color, 0x20)
-	a.text(dc, detail, 32, 140, w-64, 24, a.smallFont, muted, 0x20|0x8000)
+	if len(a.cfg.Rules) > 0 || a.inputFailureMessage != "" {
+		a.box(dc, 32, 100, w-64, 52, 12, surfaceColor, lineColor)
+		a.text(dc, "映射总开关", 48, 114, 104, 26, a.font, ink, 0x20)
+		detail, color := a.stateCopy()
+		detailWidth := w - 350
+		if a.inputFailureMessage != "" {
+			detailWidth -= 102
+		}
+		a.text(dc, detail, 164, 116, detailWidth, 22, a.smallFont, color, 0x20|0x8000)
+	}
 	if len(a.cfg.Rules) == 0 {
 		a.box(dc, w/2-28, 212, 56, 48, 14, accentWash, accentWash)
 		a.text(dc, "→", w/2-28, 212, 56, 48, a.titleFont, accentColor, 0x1|0x4|0x20)
@@ -102,17 +109,20 @@ func (a *application) paintContent(dc uintptr) {
 		a.text(dc, "告诉轻映：你想按哪个键，让它代替哪个键。", 32, 312, w-64, 24, a.font, muted, 0x1|0x20)
 		a.text(dc, "例如，按鼠标侧键，代替按下滚轮。", 32, 442, w-64, 24, a.smallFont, muted, 0x1|0x20)
 	} else {
-		a.text(dc, "轻映自己的窗口内不改键，方便你修改配置。", 32, 170, w-64, 22, a.smallFont, muted, 0x20)
 		if a.successMessage != "" {
-			a.box(dc, 32, 198, w-64, 66, 12, accentWash, accentWash)
-			a.text(dc, a.successMessage, 48, 207, w-340, 23, a.font, accentColor, 0x20|0x8000)
+			a.box(dc, 32, 162, w-64, 66, 12, accentWash, accentWash)
+			a.text(dc, a.successMessage, 48, 171, w-340, 23, a.font, accentColor, 0x20|0x8000)
 			note := "切换到其他应用试按；最小化后仍会运行。"
 			if !a.successActive {
-				note = "规则已保存，恢复全部或开启该条规则后再试按。"
+				note = "规则已保存，打开总开关及该条开关后再试按。"
+				if a.inputFailureMessage != "" {
+					note = "规则已保存，请先处理输入服务异常。"
+				}
 			}
-			a.text(dc, note, 48, 236, w-96, 22, a.smallFont, muted, 0x20|0x8000)
+			a.text(dc, note, 48, 200, w-96, 22, a.smallFont, muted, 0x20|0x8000)
 		}
-		a.text(dc, "我的映射", 32, a.listTop()-44, 300, 28, a.headingFont, ink, 0x20)
+		a.text(dc, "我的映射", 32, a.listTop()-44, 100, 28, a.headingFont, ink, 0x20)
+		a.text(dc, "在其他应用中生效", 140, a.listTop()-38, w-350, 22, a.smallFont, muted, 0x20)
 	}
 	if a.configSaveError != "" {
 		a.text(dc, "当前更改尚未保存，可重试。", 32, h-84, 260, 24, a.smallFont, warningColor, 0x20)
@@ -141,19 +151,14 @@ func (a *application) drawButton(d *drawItemStruct) {
 	if primary {
 		bg, fg, border = accentColor, surfaceColor, accentColor
 	}
+	background := a.background
 	if id == idToggle {
-		bg, border = surfaceColor, lineColor
+		bg, border, background = surfaceColor, surfaceColor, a.whiteBrush
 	}
 	if id >= rowActionBase {
-		bg, border = surfaceColor, surfaceColor
-		index, action := (id-rowActionBase)/3, (id-rowActionBase)%3
-		if index < len(a.cfg.Rules) && action == 0 {
-			if a.cfg.Rules[index].Enabled {
-				bg, border = accentWash, accentWash
-			} else {
-				bg, fg, border = softColor, muted, softColor
-			}
-		}
+		bg, border = surfaceColor, lineColor
+		background, _, _ = createSolidBrush.Call(a.rowBackground((id - rowActionBase) / 3))
+		defer deleteObject.Call(background)
 	}
 	if d.State&1 != 0 {
 		if primary {
@@ -168,18 +173,28 @@ func (a *application) drawButton(d *drawItemStruct) {
 	if d.State&0x10 != 0 {
 		border = accentColor
 	}
-	fillRect.Call(d.DC, uintptr(unsafe.Pointer(&d.Rect)), a.background)
+	fillRect.Call(d.DC, uintptr(unsafe.Pointer(&d.Rect)), background)
 	w, h := int(d.Rect.Right)*96/a.dpi, int(d.Rect.Bottom)*96/a.dpi
+	if id == idToggle {
+		on := a.cfg.Enabled && a.inputFailureMessage == ""
+		a.drawSwitch(d.DC, 8, (h-22)/2, 40, 22, on)
+		label := "已暂停"
+		if on {
+			label = "已开启"
+		}
+		if a.inputFailureMessage != "" {
+			label = "故障暂停"
+		}
+		a.text(d.DC, label, 58, 0, w-58, h, a.smallFont, fg, 0x4|0x20)
+		if d.State&0x10 != 0 {
+			a.line(d.DC, 8, h-2, w-2, h-2, accentColor, 1)
+		}
+		return
+	}
 	if id >= rowActionBase && (id-rowActionBase)%3 == 0 {
 		index := (id - rowActionBase) / 3
 		if index < len(a.cfg.Rules) {
-			on := a.cfg.Rules[index].Enabled
-			track, knob := rgb(174, 187, 178), 5
-			if on {
-				track, knob = accentColor, 17
-			}
-			a.box(d.DC, 2, (h-18)/2, 30, 18, 18, track, track)
-			a.box(d.DC, knob, (h-12)/2, 12, 12, 12, surfaceColor, surfaceColor)
+			a.drawSwitch(d.DC, 2, (h-18)/2, 30, 18, a.cfg.Rules[index].Enabled)
 			a.text(d.DC, ruleEnabledText(a.cfg.Rules[index]), 38, 0, w-38, h, a.smallFont, fg, 0x4|0x20)
 			if d.State&0x10 != 0 {
 				a.line(d.DC, 2, h-2, w-2, h-2, accentColor, 1)
@@ -199,6 +214,22 @@ func (a *application) drawButton(d *drawItemStruct) {
 	a.textRect(d.DC, label, &d.Rect, a.smallFont, fg, 0x1|0x4|0x20)
 }
 
+func (a *application) drawSwitch(dc uintptr, x, y, w, h int, on bool) {
+	track, knob := rgb(174, 187, 178), x+3
+	if on {
+		track, knob = accentColor, x+w-h+3
+	}
+	a.box(dc, x, y, w, h, h, track, track)
+	a.box(dc, knob, y+3, h-6, h-6, h-6, surfaceColor, surfaceColor)
+}
+
+func (a *application) rowBackground(index int) uintptr {
+	if send(a.controls[idList], lvmFirst+44, uintptr(index), 2) != 0 {
+		return softColor
+	}
+	return surfaceColor
+}
+
 func (a *application) drawList(d *listCustomDraw) uintptr {
 	if d.Draw.Stage == 1 {
 		return 0x20
@@ -216,10 +247,7 @@ func (a *application) drawList(d *listCustomDraw) uintptr {
 	top := int(r.Top) * 96 / a.dpi
 	h := int(r.Bottom-r.Top) * 96 / a.dpi
 	fillRect.Call(d.Draw.DC, uintptr(unsafe.Pointer(&r)), a.whiteBrush)
-	bg := surfaceColor
-	if send(a.controls[idList], lvmFirst+44, uintptr(i), 2) != 0 {
-		bg = softColor
-	}
+	bg := a.rowBackground(i)
 	a.box(d.Draw.DC, 4, top+3, w-26, h-6, 12, bg, lineColor)
 	widths := a.listWidths()
 	row := a.cfg.Rules[i]

@@ -98,6 +98,7 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 		t.Fatal("new rule not created")
 	}
 	captureInterface(t, a.hwnd, "v2-first-success.png")
+	testNativeRowRepaint(t, a)
 	// Inline toggle pauses only this rule and edit opens directly at confirmation.
 	a.command(rowActionBase)
 	if a.cfg.Rules[0].Enabled {
@@ -202,6 +203,15 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if a.cfg.Enabled || a.engine.enabled || !strings.Contains(a.inputFailureMessage, "超时") {
 		t.Fatal("input fault hidden")
 	}
+	if enabled, _, _ := user32.NewProc("IsWindowEnabled").Call(a.controls[idToggle]); enabled != 0 {
+		t.Fatal("fault leaves the switch looking usable")
+	}
+	send(a.controls[idFaultDetails], 0x00f5, 0, 0)
+	if a.info == nil || a.info.page != "support" {
+		t.Fatal("fault has no actionable details")
+	}
+	a.closeInformation()
+	captureInterface(t, a.hwnd, "v2-input-failure.png")
 	a.command(idNew)
 	a.editorChoose("F8")
 	a.editorCommand(eNext)
@@ -257,7 +267,7 @@ func testNativeLayout(t *testing.T, a *application) {
 	}
 	w, h := a.clientSize(a.hwnd)
 	mapPoints := user32.NewProc("MapWindowPoints")
-	for _, hwnd := range []uintptr{a.controls[idNew], a.controls[idToggle], a.controls[idList], a.rowActions[19][0], a.rowActions[19][1], a.rowActions[19][2]} {
+	for _, hwnd := range []uintptr{a.controls[idAbout], a.controls[idSupport], a.controls[idHelp], a.controls[idNew], a.controls[idToggle], a.controls[idList], a.rowActions[19][0], a.rowActions[19][1], a.rowActions[19][2]} {
 		var r rect
 		getWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
 		mapPoints.Call(0, a.hwnd, uintptr(unsafe.Pointer(&r)), 2)
@@ -266,6 +276,20 @@ func testNativeLayout(t *testing.T, a *application) {
 		}
 	}
 	captureInterface(t, a.hwnd, "v2-main-small-scrolled.png")
+	// Native scrolling moves child windows as well. After repeated scrolling,
+	// the actions must still align with and open the corresponding rule.
+	for _, index := range []int{0, 19, 8, 18} {
+		a.selectRule(index)
+		if !visible(a.rowActions[index][1]) {
+			t.Fatalf("scrolled rule %d lost edit button", index)
+		}
+		send(a.rowActions[index][1], 0x00f5, 0, 0) // BM_CLICK, including WM_COMMAND routing.
+		if a.editor == nil || a.editor.index != index {
+			t.Fatal("scrolled button opened a different rule")
+		}
+		a.closeEditor(true)
+	}
+	a.selectRule(19)
 	send(a.controls[idList], 0x0100, 0x71, 0)
 	if a.editor == nil || a.editor.index != 19 {
 		t.Fatal("F2 did not open selected rule")
@@ -274,6 +298,95 @@ func testNativeLayout(t *testing.T, a *application) {
 	a.cfg = previous
 	a.refreshList()
 	moveWindow.Call(a.hwnd, 0, 0, uintptr(a.px(windowWidth+16)), uintptr(a.px(windowHeight+40)), 1)
+}
+
+func testNativeRowRepaint(t *testing.T, a *application) {
+	t.Helper()
+	list := a.controls[idList]
+	getParent := user32.NewProc("GetParent")
+	for _, button := range a.rowActions[0] {
+		parent, _, _ := getParent.Call(button)
+		if parent != list {
+			t.Fatal("row actions can be overpainted by the list")
+		}
+	}
+	// Exercise selection using the real list mouse messages. Only repaint the
+	// list afterwards: repainting each button would mask the reported bug.
+	preview := os.Getenv("SIMPLE_KEYMAP_UI_PREVIEW_DIR") != ""
+	if preview {
+		showWindow.Call(a.hwnd, 4)
+		user32.NewProc("RedrawWindow").Call(a.hwnd, 0, 0, 0x185) // Invalidate, erase, all children, update now.
+		defer showWindow.Call(a.hwnd, 0)
+	}
+	for _, selected := range []bool{false, true, false, true} {
+		item := listItem{StateMask: 3}
+		send(list, lvmFirst+43, ^uintptr(0), uintptr(unsafe.Pointer(&item)))
+		if selected {
+			position := uintptr(a.px(24)) | uintptr(a.px(40))<<16
+			// The native list tracks selection in a nested message loop until
+			// release; queue that release before sending the button-down.
+			postMessage.Call(list, 0x0202, 0, position)
+			send(list, 0x0201, 1, position)
+			if a.selectedRule() != 0 {
+				t.Fatal("native click failed to select rule")
+			}
+		}
+		invalidateRect.Call(list, 0, 1)
+		// Paint pending updates, including children invalidated by selection;
+		// do not force invalidation of otherwise unchanged row buttons.
+		user32.NewProc("RedrawWindow").Call(list, 0, 0, 0x180)
+		for _, button := range a.rowActions[0] {
+			style, _, _ := user32.NewProc("GetWindowLongPtrW").Call(button, intArg(-16))
+			if style&wsVisible == 0 {
+				t.Fatal("selection or repaint hid a row action")
+			}
+		}
+		if selected {
+			captureScreenInterface(t, a.hwnd, "v2-row-selected.png")
+		} else {
+			captureScreenInterface(t, a.hwnd, "v2-row-unselected.png")
+		}
+	}
+	// Tab traversal must reach nested actions, and a native click must still
+	// open the correct editor after selection, deselection and repainting.
+	setFocus.Call(list)
+	msg := winMessage{Hwnd: list, Message: 0x0100, WParam: 9}
+	if !a.enterRowActions(&msg) {
+		t.Fatal("Tab failed to enter row actions")
+	}
+	focus, _, _ := getFocus.Call()
+	if focus != a.rowActions[0][0] {
+		t.Fatalf("Tab cannot reach the row switch: focus %x (%s), list %x, switch %x", focus, windowText(focus), list, a.rowActions[0][0])
+	}
+	for _, next := range []uintptr{a.rowActions[0][1], a.rowActions[0][2]} {
+		msg.Hwnd = focus
+		isDialogMessage.Call(a.hwnd, uintptr(unsafe.Pointer(&msg)))
+		focus, _, _ = getFocus.Call()
+		if focus != next {
+			t.Fatal("Tab failed to traverse row actions")
+		}
+	}
+	send(a.rowActions[0][1], 0x00f5, 0, 0)
+	if a.editor == nil || a.editor.index != 0 {
+		t.Fatal("edit button stopped working after repaint")
+	}
+	a.closeEditor(true)
+	// The global switch retains each rule's individual choice across both
+	// clicks and the global shortcut. Its accessible name follows the state.
+	before := append([]rule(nil), a.cfg.Rules...)
+	for _, command := range []func(){func() { send(a.controls[idToggle], 0x00f5, 0, 0) }, func() { send(a.hwnd, wmHotkey, 0, 0) }} {
+		command()
+		if !reflect.DeepEqual(a.cfg.Rules, before) {
+			t.Fatal("global switch changed individual rule choices")
+		}
+		state := "已暂停"
+		if a.cfg.Enabled {
+			state = "已开启"
+		}
+		if !strings.Contains(windowText(a.controls[idToggle]), state) {
+			t.Fatal("global switch accessibility text is out of date")
+		}
+	}
 }
 
 func testWizardCapture(t *testing.T, a *application) {
@@ -507,6 +620,16 @@ func testDiagnosticClipboard(t *testing.T, a *application) {
 
 // Captures native control rendering only when explicitly requested locally.
 func captureInterface(t *testing.T, hwnd uintptr, filename string) {
+	captureNativeInterface(t, hwnd, filename, false)
+}
+
+// Screen captures deliberately avoid PrintWindow, which repaints all children
+// and can hide the overlay bug seen after a list-only selection repaint.
+func captureScreenInterface(t *testing.T, hwnd uintptr, filename string) {
+	captureNativeInterface(t, hwnd, filename, true)
+}
+
+func captureNativeInterface(t *testing.T, hwnd uintptr, filename string, screen bool) {
 	t.Helper()
 	directory := os.Getenv("SIMPLE_KEYMAP_UI_PREVIEW_DIR")
 	if directory == "" {
@@ -531,7 +654,12 @@ func captureInterface(t *testing.T, hwnd uintptr, filename string) {
 	bitmap, _, _ := createCompatibleBitmap.Call(dc, uintptr(w), uintptr(h))
 	defer deleteObject.Call(bitmap)
 	old, _, _ := selectObject.Call(buffer, bitmap)
-	user32.NewProc("PrintWindow").Call(hwnd, buffer, 0)
+	if screen {
+		gdi32.NewProc("GdiFlush").Call()
+		bitBlt.Call(buffer, 0, 0, uintptr(w), uintptr(h), dc, 0, 0, 0x00CC0020)
+	} else {
+		user32.NewProc("PrintWindow").Call(hwnd, buffer, 0)
+	}
 	selectObject.Call(buffer, old)
 	header := struct {
 		Size                   uint32

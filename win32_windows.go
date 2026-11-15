@@ -42,6 +42,7 @@ var (
 	getFocus               = user32.NewProc("GetFocus")
 	getWindowText          = user32.NewProc("GetWindowTextW")
 	getWindowTextLength    = user32.NewProc("GetWindowTextLengthW")
+	setWindowLong          = user32.NewProc("SetWindowLongPtrW")
 	openClipboard          = user32.NewProc("OpenClipboard")
 	closeClipboard         = user32.NewProc("CloseClipboard")
 	emptyClipboard         = user32.NewProc("EmptyClipboard")

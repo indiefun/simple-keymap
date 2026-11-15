@@ -33,7 +33,7 @@ const (
 	idRetrySave
 	idNew
 	idPreset
-	idHelpMenu
+	idFaultDetails
 	idUndo
 	idTryNow
 	idDismissSuccess
@@ -221,6 +221,9 @@ func runMessageLoop(hwnd uintptr) {
 		}
 		// IsDialogMessage gives native tab/arrow navigation to our regular window.
 		var handled uintptr
+		if app != nil && app.enterRowActions(&msg) {
+			continue
+		}
 		if app != nil && app.editor != nil && app.editorOwns(msg.Hwnd) {
 			if msg.Message == 0x0100 && msg.WParam == 0x1B {
 				app.requestCloseEditor()
