@@ -36,7 +36,11 @@
 
 配置窗口内暂不执行映射，方便操作；切到其他程序后生效。最小化后继续映射，关闭窗口停止监听并退出。正常退出会丢弃积压操作，仅释放已经模拟按住的键。
 
-配置自动保存到 `%APPDATA%/SimpleKeymap/config.json`。启动会恢复规则和总开关；配置读取失败时暂停，并保留原文件直到主动修改。
+配置自动保存到 **`SimpleKeymap.exe` 同目录的 `config.json`**，迁移时复制整个软件文件夹即可带走规则、总开关、单条开关和更新偏好。底部使用一条状态栏显示操作结果或保存错误。
+
+同目录没有 `config.json` 时，首次启动会创建默认配置。请将软件放在可写目录；创建失败时会提示并暂停映射。配置读取失败时保留原文件，方便检查或恢复。
+
+升级时关闭旧版，将新版完整解压到原软件目录，保留 `config.json`；若改用新文件夹，请一并复制原来的 `config.json`。发布包不携带用户配置，不会用空白配置覆盖已有设置。
 
 ## 开源许可与项目标识
 
@@ -83,10 +87,10 @@ Windows x64，Go 1.23 或更新版本；无第三方 Go 依赖，不需要 C 编
 ```powershell
 .\build.ps1
 # 或指定版本，GitHub Release 也使用同一脚本：
-.\build.ps1 -Version 1.2.0
+.\build.ps1 -Version 1.2.1
 ```
 
-脚本运行测试和 `go vet`，随后结束**本工程目录内**正在运行的轻映及输入辅助进程，重新生成 `dist` 内的两个 exe、`SimpleKeymap-v1.2.0-windows-x64.zip` 和同名 `.sha256` 校验文件。版本默认取 `VERSION`，也可用 `-Version` 指定；标题栏、关于窗口和包内说明都包含版本号。打包后自动核对 ZIP 内容、许可文件、对应版本源码链接、exe 内置版本和校验和。不会结束其他目录里的同名程序。测试或构建失败会报错。Go 不在 PATH 时使用工程内 `.tools/go/bin/go.exe`。
+脚本运行测试和 `go vet`，随后结束**本工程目录内**正在运行的轻映及输入辅助进程，重新生成 `dist` 内的两个 exe、`SimpleKeymap-v1.2.1-windows-x64.zip` 和同名 `.sha256` 校验文件。版本默认取 `VERSION`，也可用 `-Version` 指定；标题栏、关于窗口和包内说明都包含版本号。打包后自动核对 ZIP 内容、许可文件、对应版本源码链接、exe 内置版本和校验和。不会结束其他目录里的同名程序。测试或构建失败会报错。Go 不在 PATH 时使用工程内 `.tools/go/bin/go.exe`。
 
 仅检查、不打包、不结束正在使用的程序：
 
@@ -100,8 +104,8 @@ Windows x64，Go 1.23 或更新版本；无第三方 Go 依赖，不需要 C 编
 
 ```powershell
 git push origin main
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.2.1
+git push origin v1.2.1
 ```
 
 `.github/workflows/release.yml` 仅响应 `v主版本.次版本.修订号` 标签，要求与 `VERSION` 一致，并从同一标签生成程序 ZIP、完整源码 ZIP 及各自 SHA256，然后创建 GitHub Release。发布说明放在 `.github/release-notes/v版本号.md`。使用 GitHub 提供的 `GITHUB_TOKEN`，无需自行配置发布密钥。程序 ZIP 内保留稳定的两个 exe 文件名及许可、版权和品牌说明，方便用户覆盖升级。

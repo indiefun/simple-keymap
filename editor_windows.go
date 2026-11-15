@@ -573,7 +573,7 @@ func (a *application) saveEditor() {
 	a.apply()
 	a.successMessage = message + keyCaption(r.Source) + " → " + keyCaption(r.Target)
 	a.successActive = a.cfg.Enabled && r.Enabled && a.inputFailureMessage == ""
-	a.status = "设置已保存到本机。"
+	a.status = "设置已保存到软件同目录。"
 	a.closeEditor(true)
 	a.refreshList()
 	a.selectRule(index)

@@ -34,11 +34,51 @@ func validateRules(rules []rule) error {
 }
 
 func configPath() (string, error) {
-	dir, err := os.UserConfigDir()
+	executable, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "SimpleKeymap", "config.json"), nil
+	return filepath.Join(filepath.Dir(executable), "config.json"), nil
+}
+
+func loadPortableConfig(path string) (config, error) {
+	if _, err := os.Lstat(path); err == nil {
+		return loadConfig(path)
+	} else if !os.IsNotExist(err) {
+		return config{Enabled: false}, err
+	}
+	c := config{Enabled: true, Rules: []rule{}}
+	if err := createConfig(path, c); err != nil {
+		if os.IsExist(err) {
+			// Another writer created it after the existence check. Respect it.
+			return loadConfig(path)
+		}
+		return config{Enabled: false}, fmt.Errorf("无法在软件同目录创建 config.json，请将整个软件文件夹移到可写位置后重试：%w", err)
+	}
+	return c, nil
+}
+
+// Initial creation must never replace an existing portable configuration.
+// Later user edits use saveConfig's temporary file and atomic replacement.
+func createConfig(path string, c config) error {
+	data, err := configData(c)
+	if err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return err
+	}
+	if _, err = file.Write(data); err != nil {
+		file.Close()
+		os.Remove(path)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
 }
 
 func loadConfig(path string) (config, error) {
@@ -59,11 +99,19 @@ func loadConfig(path string) (config, error) {
 	return c, nil
 }
 
-func saveConfig(path string, c config) error {
+func configData(c config) ([]byte, error) {
 	if err := validateRules(c.Rules); err != nil {
-		return err
+		return nil, err
 	}
 	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(data, '\n'), nil
+}
+
+func saveConfig(path string, c config) error {
+	data, err := configData(c)
 	if err != nil {
 		return err
 	}
@@ -76,7 +124,7 @@ func saveConfig(path string, c config) error {
 	}
 	name := tmp.Name()
 	defer os.Remove(name)
-	if _, err = tmp.Write(append(data, '\n')); err != nil {
+	if _, err = tmp.Write(data); err != nil {
 		tmp.Close()
 		return err
 	}

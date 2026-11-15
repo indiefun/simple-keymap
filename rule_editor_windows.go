@@ -10,7 +10,7 @@ import (
 
 func errorCause(err error) string {
 	if os.IsPermission(err) {
-		return "配置目录无法写入，请检查文件夹权限"
+		return "软件目录无法写入，请移动整个文件夹到可写位置"
 	}
 	if os.IsNotExist(err) {
 		return "配置目录不可用，请检查目录或磁盘后重试"
@@ -33,7 +33,7 @@ func (a *application) persistConfig() {
 	if err := saveConfig(a.path, a.cfg); err != nil {
 		a.configSaveError = errorCause(err)
 	} else if previous != "" {
-		a.status = "保存已恢复，当前设置已保存到本机。"
+		a.status = "保存已恢复，设置已保存到软件同目录。"
 	}
 	if a.info != nil && a.info.page == "support" {
 		a.updateInformation("support")
@@ -43,7 +43,10 @@ func (a *application) persistConfig() {
 
 func (a *application) footerCopy() string {
 	if a.configSaveError != "" {
-		return "更改仅本次生效，尚未保存"
+		return "尚未保存 · " + a.configSaveError
 	}
-	return "配置自动保存在本机"
+	if a.status != "" {
+		return a.status
+	}
+	return "配置保存在软件同目录 · config.json"
 }

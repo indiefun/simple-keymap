@@ -178,7 +178,7 @@ func (a *application) updatesContent() string {
 	if !state.checkedAt.IsZero() && !state.checking {
 		body += "\n检查时间：" + state.checkedAt.Format("2006-01-02 15:04")
 	}
-	body += "\n\n点击「前往下载」获取新版。关闭旧版后，将新版完整解压运行，已有映射和开关设置会保留。\n\n启用下方选项后，启动时会联网检查版本，发现新版时在顶部提示。更新由你下载并替换。"
+	body += "\n\n点击「前往下载」获取新版。关闭旧版后，将新版完整解压到原软件目录，保留 config.json。若使用新文件夹，请一并复制 config.json。\n\n启用下方选项后，启动时会联网检查版本，发现新版时在顶部提示。更新由你下载并替换。"
 	if state.settingErr != "" {
 		body += "\n\n" + state.settingErr
 	}

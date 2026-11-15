@@ -121,7 +121,7 @@ func main() {
 		showError(0, "无法找到配置目录："+err.Error())
 		return
 	}
-	cfg, loadErr := loadConfig(path)
+	cfg, loadErr := loadPortableConfig(path)
 	app = &application{
 		controls: map[int]uintptr{}, cfg: cfg, path: path, engine: newEngine(),
 		modifiers: map[string]bool{}, status: "准备好了，添加一条映射就可以开始。", dpi: 96,
@@ -172,6 +172,9 @@ func main() {
 	app.refreshList()
 	if len(app.cfg.Rules) != 0 {
 		app.status = fmt.Sprintf("已载入 %d 条映射。", len(app.cfg.Rules))
+	}
+	if loadErr != nil {
+		app.status = "配置未能载入，映射已暂停。"
 	}
 	showWindow.Call(app.hwnd, 5)
 	updateWindow.Call(app.hwnd)

@@ -125,19 +125,19 @@ func (a *application) paintContent(dc uintptr) {
 		a.text(dc, "我的映射", 32, a.listTop()-44, 100, 28, a.headingFont, ink, 0x20)
 		a.text(dc, "在其他应用中生效", 140, a.listTop()-38, w-350, 22, a.smallFont, muted, 0x20)
 	}
-	if a.configSaveError != "" {
-		a.text(dc, "当前更改尚未保存，可重试。", 32, h-84, 260, 24, a.smallFont, warningColor, 0x20)
-	} else if a.status != "" {
-		a.text(dc, a.status, 32, h-84, w-180, 24, a.smallFont, muted, 0x20|0x8000)
-	}
-	a.line(dc, 32, h-54, w-32, h-54, lineColor, 1)
-	footer := "配置自动保存在本机"
+	a.line(dc, 32, h-64, w-32, h-64, lineColor, 1)
 	fg := muted
 	if a.configSaveError != "" {
-		footer = "更改仅本次生效，尚未保存"
 		fg = warningColor
 	}
-	a.text(dc, footer, 32, h-42, 260, 24, a.smallFont, fg, 0x20)
+	available := w - 64
+	if a.deletedRule != nil {
+		available -= 108
+	}
+	if a.configSaveError != "" {
+		available = w - 280
+	}
+	a.text(dc, a.footerCopy(), 32, h-48, available, 24, a.smallFont, fg, 0x20|0x8000)
 }
 
 func (a *application) drawButton(d *drawItemStruct) {

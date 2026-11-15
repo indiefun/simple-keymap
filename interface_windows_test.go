@@ -182,6 +182,9 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	a.successMessage = ""
 	a.layoutMain()
 	captureInterface(t, a.hwnd, "v2-main.png")
+	if a.footerCopy() != a.status {
+		t.Fatal("recent operation was not merged into the save status bar")
+	}
 	testInformationFlow(t, a)
 	testNativeUpdates(t, a)
 	// UI changes cannot re-enable a failed input service, and output handoff
@@ -522,6 +525,7 @@ func testTransactionalSave(t *testing.T, a *application) {
 	if !strings.Contains(a.footerCopy(), "尚未保存") {
 		t.Fatal("ordinary operation hid save failure")
 	}
+	captureInterface(t, a.hwnd, "v2-save-warning.png")
 	diagnostic := a.diagnosticText()
 	for _, sensitive := range []string{a.path, blocked, "mouse_x1", "config.json"} {
 		if strings.Contains(diagnostic, sensitive) {

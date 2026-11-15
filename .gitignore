@@ -7,3 +7,4 @@
 /.wrangler/
 /site/downloads/
 *.log
+/config.json
