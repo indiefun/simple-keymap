@@ -571,9 +571,15 @@ func (a *application) saveEditor() {
 	a.cfg = next
 	a.configSaveError = ""
 	a.apply()
-	a.successMessage = message + keyCaption(r.Source) + " → " + keyCaption(r.Target)
-	a.successActive = a.cfg.Enabled && r.Enabled && a.inputFailureMessage == ""
-	a.status = "设置已保存到软件同目录。"
+	note := "切到其他应用试按。"
+	if a.inputFailureMessage != "" {
+		note = "输入服务异常，请查看原因。"
+	} else if !a.cfg.Enabled {
+		note = "全部映射已暂停。"
+	} else if !r.Enabled {
+		note = "该条映射已暂停。"
+	}
+	a.status = message + keyCaption(r.Source) + " → " + keyCaption(r.Target) + " · " + note
 	a.closeEditor(true)
 	a.refreshList()
 	a.selectRule(index)

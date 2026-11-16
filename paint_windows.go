@@ -110,20 +110,8 @@ func (a *application) paintContent(dc uintptr) {
 		a.text(dc, "告诉轻映：你想按哪个键，让它代替哪个键。", 32, 312, w-64, 24, a.font, muted, 0x1|0x20)
 		a.text(dc, "例如，按鼠标侧键，代替按下滚轮。", 32, 442, w-64, 24, a.smallFont, muted, 0x1|0x20)
 	} else {
-		if a.successMessage != "" {
-			a.box(dc, 32, 162, w-64, 66, 12, accentWash, accentWash)
-			a.text(dc, a.successMessage, 48, 171, w-340, 23, a.font, accentColor, 0x20|0x8000)
-			note := "切换到其他应用试按；最小化后仍会运行。"
-			if !a.successActive {
-				note = "规则已保存，打开总开关及该条开关后再试按。"
-				if a.inputFailureMessage != "" {
-					note = "规则已保存，请先处理输入服务异常。"
-				}
-			}
-			a.text(dc, note, 48, 200, w-96, 22, a.smallFont, muted, 0x20|0x8000)
-		}
-		a.text(dc, "我的映射", 32, a.listTop()-44, 100, 28, a.headingFont, ink, 0x20)
-		a.text(dc, "在其他应用中生效", 140, a.listTop()-38, w-350, 22, a.smallFont, muted, 0x20)
+		a.text(dc, "我的映射", 32, mainListTop-44, 100, 28, a.headingFont, ink, 0x20)
+		a.text(dc, "在其他应用中生效", 140, mainListTop-38, w-350, 22, a.smallFont, muted, 0x20)
 	}
 	a.line(dc, 32, h-64, w-32, h-64, lineColor, 1)
 	fg := muted
@@ -145,7 +133,7 @@ func (a *application) drawButton(d *drawItemStruct) {
 		return
 	}
 	id := int(d.ID)
-	primary := id == idNew || id == idAdd || id == idTryNow
+	primary := id == idNew || id == idAdd
 	bg, fg, border := canvasColor, accentColor, canvasColor
 	if primary {
 		bg, fg, border = accentColor, surfaceColor, accentColor

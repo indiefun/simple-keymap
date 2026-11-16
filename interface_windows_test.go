@@ -97,6 +97,9 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if a.editor != nil || len(a.cfg.Rules) != 1 || a.cfg.Rules[0] != (rule{"mouse_x1", "mouse_middle", true}) {
 		t.Fatal("new rule not created")
 	}
+	if !strings.Contains(a.footerCopy(), "已添加：鼠标侧键 1 → 鼠标中键") || !strings.Contains(a.footerCopy(), "切到其他应用试按") || a.selectedRule() != 0 {
+		t.Fatal("saved mapping lacks status feedback or selection")
+	}
 	captureInterface(t, a.hwnd, "v2-first-success.png")
 	testNativeRowRepaint(t, a)
 	// Inline toggle pauses only this rule and edit opens directly at confirmation.
@@ -133,6 +136,9 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if a.editor != nil || a.cfg.Rules[0].Target != "space" || a.cfg.Rules[0].Enabled {
 		t.Fatal("saved edit did not retain paused state")
 	}
+	if !strings.Contains(a.footerCopy(), "已修改") || !strings.Contains(a.footerCopy(), "该条映射已暂停") {
+		t.Fatal("edited paused mapping has misleading feedback")
+	}
 	// Adding never releases an existing global pause.
 	a.command(idToggle)
 	a.command(idNew)
@@ -146,6 +152,9 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	a.editorCommand(eNext)
 	if a.cfg.Enabled || a.engine.enabled || len(a.cfg.Rules) != 2 {
 		t.Fatal("add changed global pause")
+	}
+	if !strings.Contains(a.footerCopy(), "全部映射已暂停") {
+		t.Fatal("saved mapping lost global pause feedback")
 	}
 	// Conflict identifies the existing mapping and can switch directly to edit.
 	a.command(idNew)
@@ -179,7 +188,6 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(saved, a.cfg) {
 		t.Fatal("settings round trip failed")
 	}
-	a.successMessage = ""
 	a.layoutMain()
 	captureInterface(t, a.hwnd, "v2-main.png")
 	if a.footerCopy() != a.status {
@@ -225,7 +233,7 @@ func TestNativeRuleAndCaptureFlow(t *testing.T) {
 	a.editorChoose("enter")
 	a.editorCommand(eNext)
 	a.editorCommand(eNext)
-	if a.engine.enabled || a.cfg.Enabled || a.successActive {
+	if a.engine.enabled || a.cfg.Enabled || !strings.Contains(a.footerCopy(), "输入服务异常") {
 		t.Fatal("saving enabled failed input")
 	}
 }
@@ -263,7 +271,6 @@ func testNativeLayout(t *testing.T, a *application) {
 	for index := 5; index < 25; index++ {
 		a.cfg.Rules = append(a.cfg.Rules, rule{keys[index].ID, "mouse_middle", index%2 == 0})
 	}
-	a.successMessage = ""
 	a.refreshList()
 	moveWindow.Call(a.hwnd, 0, 0, uintptr(a.px(760)), uintptr(a.px(590)), 1)
 	a.selectRule(19)

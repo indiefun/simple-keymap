@@ -35,8 +35,6 @@ const (
 	idPreset
 	idFaultDetails
 	idUndo
-	idTryNow
-	idDismissSuccess
 	idUpdates
 )
 
@@ -74,8 +72,6 @@ type application struct {
 	captureGeneration                       uintptr
 	deletedRule                             *rule
 	deletedIndex                            int
-	successMessage                          string
-	successActive                           bool
 	rowActions                              map[int][3]uintptr
 	updates                                 *updateState
 }

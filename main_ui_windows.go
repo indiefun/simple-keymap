@@ -8,7 +8,10 @@ import (
 	"unsafe"
 )
 
-const rowActionBase = 1000
+const (
+	rowActionBase = 1000
+	mainListTop   = 214
+)
 
 var listCallback = syscall.NewCallback(listProc)
 
@@ -20,7 +23,7 @@ func (a *application) createControls() error {
 		{"＋ 添加映射", idNew}, {"映射总开关", idToggle}, {"查看原因", idFaultDetails},
 		{"关于与许可", idAbout}, {"支持与反馈 ↗", idSupport}, {"检查更新", idUpdates},
 		{"添加第一条映射", idAdd}, {"用「鼠标侧键 → 中键」示例开始", idPreset},
-		{"撤销删除", idUndo}, {"重试保存", idRetrySave}, {"最小化，去试试", idTryNow}, {"知道了", idDismissSuccess},
+		{"撤销删除", idUndo}, {"重试保存", idRetrySave},
 	} {
 		if _, err := a.control("BUTTON", c.text, c.id, 0xB, 0, 0, 100, 36); err != nil {
 			return err
@@ -59,12 +62,6 @@ func (a *application) moveControl(hwnd uintptr, x, y, w, h int) {
 }
 func visibleControl(hwnd uintptr, show bool) { showWindow.Call(hwnd, boolArg(show)*5) }
 
-func (a *application) listTop() int {
-	if a.successMessage != "" {
-		return 298
-	}
-	return 214
-}
 func (a *application) layoutMain() {
 	if a.controls[idList] == 0 {
 		return
@@ -81,14 +78,12 @@ func (a *application) layoutMain() {
 	place(idToggle, w-112, 108, 64, 36, has || a.inputFailureMessage != "")
 	place(idFaultDetails, 270, 108, 92, 36, a.inputFailureMessage != "")
 	enableWindow.Call(a.controls[idToggle], boolArg(a.inputFailureMessage == ""))
-	place(idNew, w-180, a.listTop()-52, 148, 38, has)
+	place(idNew, w-180, mainListTop-52, 148, 38, has)
 	place(idAdd, (w-200)/2, 340, 200, 44, !has)
 	place(idPreset, (w-360)/2, 394, 360, 34, !has)
 	place(idUndo, w-132, h-52, 100, 32, a.deletedRule != nil)
 	place(idRetrySave, w-240, h-52, 100, 32, a.configSaveError != "")
-	place(idTryNow, w-268, 166, 152, 38, a.successMessage != "" && a.successActive)
-	place(idDismissSuccess, w-108, 166, 76, 38, a.successMessage != "")
-	a.moveControl(a.controls[idList], 32, a.listTop(), w-64, max(80, h-a.listTop()-82))
+	a.moveControl(a.controls[idList], 32, mainListTop, w-64, max(80, h-mainListTop-82))
 	visibleControl(a.controls[idList], has)
 	widths := a.listWidths()
 	for index, width := range widths {
@@ -250,7 +245,6 @@ func (a *application) command(id int) {
 		switch action {
 		case 0:
 			a.cfg.Rules[index].Enabled = !a.cfg.Rules[index].Enabled
-			a.successMessage = ""
 			a.changed("规则开关已更新。")
 			a.refreshList()
 		case 1:
@@ -278,7 +272,6 @@ func (a *application) command(id int) {
 			return
 		}
 		a.cfg.Enabled = !a.cfg.Enabled
-		a.successMessage = ""
 		a.changed("已切换全部映射的开关。")
 		a.layoutMain()
 	case idFaultDetails:
@@ -294,11 +287,6 @@ func (a *application) command(id int) {
 		a.openInformation("about")
 	case idRetrySave:
 		a.persistConfig()
-	case idTryNow:
-		showWindow.Call(a.hwnd, 6)
-	case idDismissSuccess:
-		a.successMessage = ""
-		a.layoutMain()
 	}
 }
 
@@ -311,7 +299,6 @@ func (a *application) deleteSelected() {
 	a.deletedRule = &r
 	a.deletedIndex = i
 	a.cfg.Rules = append(a.cfg.Rules[:i], a.cfg.Rules[i+1:]...)
-	a.successMessage = ""
 	a.changed("已删除：" + keyCaption(r.Source) + " → " + keyCaption(r.Target) + "。可撤销。")
 	a.refreshList()
 }
@@ -441,7 +428,6 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 				a.finishCapture(0)
 			}
 			a.cfg.Enabled = !a.cfg.Enabled
-			a.successMessage = ""
 			a.changed("已切换全部映射的开关。")
 			a.layoutMain()
 			return 0
@@ -467,7 +453,6 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 				message = "映射已暂停：输入服务已退出，请重新启动轻映。"
 			}
 			a.inputFailureMessage = message
-			a.successMessage = ""
 			a.changed(message)
 			a.layoutMain()
 			return 0
