@@ -7,6 +7,7 @@ The drawing matches icon.svg and is supersampled separately at every ICO size.
 from io import BytesIO
 from pathlib import Path
 import math
+import shutil
 import struct
 
 from PIL import Image, ImageChops, ImageDraw, ImageOps
@@ -66,7 +67,10 @@ def main():
         entries.append(struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(payload), offset))
         offset += len(payload)
     (ASSETS / "icon.ico").write_bytes(struct.pack("<HHH", 0, 1, len(SIZES)) + b"".join(entries) + b"".join(payloads))
-    print("Created assets/icon.png and assets/icon.ico (16–256px)")
+    site_assets = ASSETS.parent / "site" / "assets"
+    for source, destination in (("icon.svg", "icon.svg"), ("icon.png", "icon.png"), ("icon.ico", "favicon.ico")):
+        shutil.copyfile(ASSETS / source, site_assets / destination)
+    print("Created assets/icon.png and assets/icon.ico (16–256px); synced website icons")
 
 
 if __name__ == "__main__":

@@ -7,12 +7,8 @@ if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
     throw 'Version must use MAJOR.MINOR.PATCH, for example 1.0.0 or v1.0.0.'
 }
 $taskGo = Get-Command go -ErrorAction SilentlyContinue
-if ($taskGo) {
-    $taskGoExe = $taskGo.Source
-} else {
-    $taskGoExe = Join-Path $PSScriptRoot '.tools\go\bin\go.exe'
-    if (!(Test-Path -LiteralPath $taskGoExe)) { throw 'Please install Go 1.23+ from https://go.dev/dl/ and run this script again.' }
-}
+if (!$taskGo) { throw 'Please install Go 1.23+ from https://go.dev/dl/, add it to PATH and run this script again.' }
+$taskGoExe = $taskGo.Source
 & $taskGoExe test -timeout 30s ./...
 if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 & $taskGoExe vet ./...

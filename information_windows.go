@@ -252,8 +252,6 @@ func informationProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 	if app != nil {
 		switch msg {
 		case wmActivateApp:
-			app.configurationActive = wParam != 0
-			app.refreshRuleStatuses()
 			invalidateRect.Call(app.hwnd, 0, 0)
 			invalidateRect.Call(app.controls[idList], 0, 0)
 			return 0

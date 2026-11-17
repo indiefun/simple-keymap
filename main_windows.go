@@ -26,7 +26,6 @@ const (
 	idToggle
 	idList
 	idDelete
-	idHelp
 	idSupport
 	idAbout
 	idEdit
@@ -42,7 +41,6 @@ type application struct {
 	hwnd, instance                          uintptr
 	controls                                map[int]uintptr
 	font, smallFont, titleFont, headingFont uintptr
-	keyFont                                 uintptr
 	brandIcon                               uintptr
 	background, whiteBrush                  uintptr
 	accentBrush                             uintptr
@@ -65,7 +63,6 @@ type application struct {
 	inputFailureMessage                     string
 	status                                  string
 	configSaveError                         string
-	configurationActive                     bool
 	info                                    *informationWindow
 	editor                                  *mappingEditor
 	captureIndex                            int
@@ -273,7 +270,6 @@ func (a *application) create() error {
 	a.instance, _, _ = getModuleHandle.Call(0)
 	a.font, a.smallFont = a.makeFont(14, 400), a.makeFont(12, 400)
 	a.titleFont, a.headingFont = a.makeFont(23, 600), a.makeFont(17, 600)
-	a.keyFont = a.makeFont(19, 600)
 	a.background, _, _ = createSolidBrush.Call(canvasColor)
 	a.whiteBrush, _, _ = createSolidBrush.Call(rgb(255, 255, 255))
 	a.accentBrush, _, _ = createSolidBrush.Call(accentWash)

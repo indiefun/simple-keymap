@@ -50,22 +50,6 @@ func (a *application) textRect(dc uintptr, text string, r *rect, font, color, fl
 	selectObject.Call(dc, old)
 }
 
-func (a *application) keyIcon(dc uintptr, x, y int, mouse bool, color uintptr) {
-	if mouse {
-		a.box(dc, x+4, y, 16, 24, 12, surfaceColor, color)
-		a.line(dc, x+12, y+4, x+12, y+10, color, 2)
-		a.line(dc, x+4, y+12, x+20, y+12, color, 1)
-	} else {
-		a.box(dc, x, y+3, 24, 18, 5, surfaceColor, color)
-		for row := 0; row < 2; row++ {
-			for col := 0; col < 3; col++ {
-				a.line(dc, x+5+col*6, y+8+row*5, x+7+col*6, y+8+row*5, color, 1)
-			}
-		}
-		a.line(dc, x+7, y+17, x+17, y+17, color, 1)
-	}
-}
-
 func (a *application) paint(hwnd uintptr) {
 	var ps paintStruct
 	dc, _, _ := beginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))

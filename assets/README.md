@@ -1,22 +1,33 @@
-# 轻映图标
+# 图片与程序图标
 
-两个错位叠放的键帽，一枚向右箭头，表达「一个键变成另一个键」。深绿背景与配置界面的绿色保持一致，前景用浅色提高小尺寸识别度。
+图标由叠放键帽和映射箭头组成。普通程序构建和网站部署直接使用仓库中的资源，无需 Python 或额外图标工具。
 
-- `icon.svg`：可编辑的矢量原稿。
-- `icon.png`：512 × 512 透明背景图片。
-- `icon.ico`：Windows 图标，包含 16、20、24、32、40、48、64、128、256 像素九个尺寸。
-- `generate_icon.py`：与 SVG 几何形状一致的渲染脚本。需要 Python 和 Pillow；仅重新制作图标时使用。
+| 文件 | 用途 |
+| --- | --- |
+| `icon.svg` | 可编辑的矢量原稿 |
+| `generate_icon.py` | 与 SVG 形状对应的渲染脚本 |
+| `icon.png` | 512 × 512 图片，供网站和分享图生成使用 |
+| `icon.ico` | Windows 多尺寸图标，包含 16–256 像素九个尺寸 |
+| `../rsrc_windows_amd64.syso` | Go 构建自动嵌入的图标资源，资源 ID 为 `1` |
+| `generate_social_preview.py` | 生成官网 1200 × 630 分享图 |
+| `release-readme.txt` | 便携包使用说明模板，构建时替换 `{{VERSION}}` |
 
-程序图标已嵌入根目录的 `rsrc_windows_amd64.syso`，正常运行 `build.ps1` 即可打包，无需安装额外依赖。
+## 更新图标
 
-需要修改图标时，调整 SVG 和渲染脚本的对应形状，然后执行：
+同时调整 SVG 与渲染脚本中的形状，在仓库根目录运行：
 
 ```powershell
+python -m pip install Pillow
 python assets/generate_icon.py
-.\.tools\bin\rsrc.exe -arch amd64 -ico assets/icon.ico -o rsrc_windows_amd64.syso
+go install github.com/akavel/rsrc@v0.10.2
+$taskGoBin = go env GOBIN
+if (!$taskGoBin) { $taskGoBin = Join-Path (go env GOPATH) 'bin' }
+& (Join-Path $taskGoBin 'rsrc.exe') -arch amd64 -ico assets/icon.ico -o rsrc_windows_amd64.syso
+python assets/generate_social_preview.py
 .\build.ps1
+npm run site:check
 ```
 
-资源工具为 `github.com/akavel/rsrc@v0.10.2`，本次放在 `.tools/bin/rsrc.exe`。代码中资源 ID 为 `1`，用于 exe、标题栏和界面品牌图标。
+图标脚本同时同步网站的 `icon.svg`、`icon.png` 和 `favicon.ico`；提交时将生成资源与原稿一起提交。网站保留资源副本，以便只部署 `site/` 目录。
 
-`generate_social_preview.py` 使用现有图标生成官网的 1200 × 630 分享预览图，输出到 `site/assets/social-preview.png`。同样需要 Pillow，默认使用 Windows 微软雅黑；其他系统可通过 `--font` 和 `--bold-font` 指定中文字体。预览图只随网站发布，不影响程序打包。
+分享图默认使用 Windows 微软雅黑；其他系统可通过 `--font` 和 `--bold-font` 指定中文字体。只调整分享图时，单独运行 `python assets/generate_social_preview.py` 即可。

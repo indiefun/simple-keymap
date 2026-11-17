@@ -1,10 +1,9 @@
 /dist/
-/dist-fixed/
 /.tools/
 *.test.exe
 *.tmp
 /node_modules/
 /.wrangler/
-/site/downloads/
 *.log
 /config.json
+__pycache__/

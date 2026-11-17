@@ -25,7 +25,7 @@ for (const file of ["index.html", "404.html"]) {
     if (/^(?:https?:|#|data:)/.test(value) || value === "./" || value === "/") continue;
     const target = path.resolve(root, value.split("#")[0].replace(/^\//, ""));
     assert.ok(target.startsWith(root + path.sep), `Path escapes site: ${value}`);
-    assert.ok(fs.existsSync(target), `${file}: missing file ${value}. Run build.ps1 to package the download.`);
+    assert.ok(fs.existsSync(target), `${file}: missing file ${value}`);
   }
 }
 assert.ok(config.downloadURL, "A release download URL is required");

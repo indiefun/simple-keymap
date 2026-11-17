@@ -27,6 +27,7 @@ func errorCause(err error) string {
 	return err.Error()
 }
 
+// Keep save failures visible until the portable configuration is written.
 func (a *application) persistConfig() {
 	previous := a.configSaveError
 	a.configSaveError = ""

@@ -10,7 +10,7 @@ const {handler} = require("./serve-site.cjs");
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({headless:true, channel:process.env.BROWSER_CHANNEL || "msedge"});
-  const output = path.resolve(__dirname, "../.tools");
+  const output = path.resolve(__dirname, "../.tools/site-preview");
   fs.mkdirSync(output, {recursive:true});
   const errors = [];
   try {

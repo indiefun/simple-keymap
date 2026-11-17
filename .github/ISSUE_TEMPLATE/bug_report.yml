@@ -1,0 +1,39 @@
+name: 问题反馈
+description: 报告无法正常使用或与预期不符的问题。
+body:
+  - type: markdown
+    attributes:
+      value: 请先确认使用最新版，并搜索是否已有相同问题。
+  - type: input
+    id: version
+    attributes:
+      label: 轻映版本
+      description: 可在「关于与许可」查看。网站问题请填写「官网」。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 使用环境
+      description: Windows 版本、目标应用及是否以管理员身份运行；网站问题填写浏览器和设备。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从打开程序开始说明操作；映射问题请写明原按键和目标按键。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 预期结果与实际结果
+      description: 说明你希望发生什么、实际发生什么，以及是否每次都能复现。
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 诊断摘要（可选）
+      description: 可从「关于与许可 → 诊断信息」复制。无需上传个人配置或按键记录。

@@ -198,8 +198,6 @@ func (a *application) selectRule(index int) {
 	send(a.controls[idList], lvmFirst+19, uintptr(index), 0)
 	a.layoutRowActions()
 }
-func (a *application) refreshRuleStatuses() { invalidateRect.Call(a.controls[idList], 0, 0) }
-
 func (a *application) popup(owner uintptr, entries []struct {
 	id   int
 	text string
@@ -276,8 +274,6 @@ func (a *application) command(id int) {
 		a.layoutMain()
 	case idFaultDetails:
 		a.openInformation("support")
-	case idHelp:
-		a.openInformation("help")
 	case idSupport:
 		a.openSupport()
 	case idUpdates:
@@ -354,7 +350,7 @@ func (a *application) dispose() {
 	}
 	a.closeEditor(true)
 	a.closeInformation()
-	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.keyFont, a.background, a.whiteBrush, a.accentBrush} {
+	for _, object := range []uintptr{a.font, a.smallFont, a.titleFont, a.headingFont, a.background, a.whiteBrush, a.accentBrush} {
 		if object != 0 {
 			deleteObject.Call(object)
 		}
@@ -378,7 +374,6 @@ func windowProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		}
 		switch msg {
 		case wmActivateApp:
-			a.configurationActive = wParam != 0
 			invalidateRect.Call(a.hwnd, 0, 0)
 			return 0
 		case wmSize:
